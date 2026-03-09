@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mnemonic Forge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* THE OBSIDIAN SPECTRUM */
+        :root {
+            --void: #050505;
+            --cyan: #00F2FF;
+            --violet: #BD00FF;
+            --entropy: #FF3131;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none; /* Prevents text highlighting for an app-like feel */
+        }
+
+        body {
+            background-color: var(--void);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Locks the screen, preventing unwanted scrolling */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* 1. THE THRESHOLD (Quote Screen) */
+        #threshold {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--void);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1.5s ease, visibility 1.5s;
+            cursor: pointer;
+        }
+
+        .axiom {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            text-align: center;
+            max-width: 80%;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .step-inside {
+            font-size: 0.8rem;
+            letter-spacing: 4px;
+            color: var(--cyan);
+            opacity: 0.6;
+            animation: pulse 2s infinite;
+        }
+
+        /* 2. THE SANCTUM (Main Page) */
+        #sanctum {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 2s ease;
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        h1.forge-title {
+            font-family: 'Cinzel', serif;
+            font-size: 2.5rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            margin-bottom: 3rem;
+            text-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+        }
+
+        /* The Vertical Pillars */
+        .module-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            width: 85%;
+        }
+
+        .glass-btn {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px; /* No hard corners */
+            padding: 1.2rem 1.5rem;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 400;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .glass-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .glass-btn span.icon {
+            font-size: 1.4rem;
+        }
+
+        /* 3. THE BLOOM MENU (Bottom Left) */
+        #bloom-container {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 50;
+        }
+
+        .bloom-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            color: var(--cyan);
+            font-size: 1.8rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
+        }
+
+        .bloom-btn:hover {
+            background: rgba(0, 242, 255, 0.1);
+            transform: scale(1.1);
+        }
+
+        .bloom-options {
+            position: absolute;
+            bottom: 70px;
+            left: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .bloom-options.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .mini-btn {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 10px 15px;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .mini-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--cyan);
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.9; }
+            100% { opacity: 0.4; }
+        }
+        
+        /* Subtle background glow representing the cosmic web in the distance */
+        .void-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(189,0,255,0.03) 0%, rgba(5,5,5,0) 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="void-glow"></div>
+
+    <div id="threshold" onclick="enterForge()">
+        <div class="axiom">"A reader lives a thousand lives before he dies.<br>The man who never reads lives only one."</div>
+        <div class="step-inside">TOUCH TO STEP INSIDE</div>
+    </div>
+
+    <div id="sanctum">
+        <h1 class="forge-title">MNEMONIC FORGE</h1>
+        
+        <div class="module-stack">
+            <button class="glass-btn" onclick="location.href='cosmic-web.html'">
+                <span class="icon">☁️</span> Cosmic Web
+            </button>
+            <button class="glass-btn">
+                <span class="icon">🌱</span> Garden of Virtues
+            </button>
+            <button class="glass-btn">
+                <span class="icon">⚡</span> P-realm Accelerator
+            </button>
+            <button class="glass-btn">
+                <span class="icon">♟️</span> Game Matrix
+            </button>
+            <button class="glass-btn">
+                <span class="icon">🕸️</span> Connections
+            </button>
+        </div>
+    </div>
+
+    <div id="bloom-container">
+        <div class="bloom-options" id="bloomMenu">
+            <button class="mini-btn">Origins</button>
+            <button class="mini-btn">Other Apps</button>
+            <button class="mini-btn" style="color: var(--entropy);">[x] Close</button>
+        </div>
+        <button class="bloom-btn" id="mainBloomToggle" onclick="toggleBloom()">+</button>
+    </div>
+
+    <script>
+        // 1. Threshold Transition Logic
+        function enterForge() {
+            const threshold = document.getElementById('threshold');
+            const sanctum = document.getElementById('sanctum');
+            
+            threshold.style.opacity = '0';
+            setTimeout(() => {
+                threshold.style.visibility = 'hidden';
+                sanctum.style.visibility = 'visible';
+                sanctum.style.opacity = '1';
+            }, 1000); // Waits for the fade-out to finish
+        }
+
+        // 2. Bloom Menu Logic
+        function toggleBloom() {
+            const menu = document.getElementById('bloomMenu');
+            const btn = document.getElementById('mainBloomToggle');
+            
+            menu.classList.toggle('active');
+            
+            // Rotate the + icon for visual feedback
+            if (menu.classList.contains('active')) {
+                btn.style.transform = 'rotate(45deg)';
+                btn.style.color = 'var(--entropy)'; // Turns red to indicate 'Close'
+            } else {
+                btn.style.transform = 'rotate(0deg)';
+                btn.style.color = 'var(--cyan)'; // Returns to Electric Cyan
+            }
+        }
+    </script>
+</body>
+</html>
