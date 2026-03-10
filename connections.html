@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connections | Mnemonic Forge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* THE OBSIDIAN SPECTRUM */
+        :root { 
+            --void: #050505; 
+            --cyan: #00F2FF; 
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.12);
+        }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--void); 
+            color: white; 
+            margin: 0; 
+            min-height: 100vh;
+        }
+        
+        .lux-serif { font-family: 'Cinzel', serif; letter-spacing: 0.2em; }
+        .mono-text { font-family: 'JetBrains Mono', monospace; }
+
+        .forge-bg {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle at center, #111111 0%, var(--void) 100%);
+            z-index: -1;
+        }
+
+        /* Central Mind Map Canvas */
+        .mind-map-container {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            width: 100%;
+            height: 400px; /* Large square-ish area as per sketch */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        /* The pulsing center to signify readiness */
+        .core-node {
+            width: 20px;
+            height: 20px;
+            background: var(--cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--cyan);
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(0, 242, 255, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); }
+        }
+
+        /* The Three Bottom Buttons */
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .action-btn {
+            background: rgba(0, 242, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 15px 0;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .action-btn:hover {
+            background: rgba(0, 242, 255, 0.15);
+            border-color: var(--cyan);
+            color: var(--cyan);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 242, 255, 0.1);
+        }
+
+        /* Destructive styling for Delete */
+        .btn-delete:hover {
+            background: rgba(255, 49, 49, 0.15);
+            border-color: #FF3131;
+            color: #FF3131;
+            box-shadow: 0 10px 20px rgba(255, 49, 49, 0.1);
+        }
+
+    </style>
+</head>
+<body class="p-6 md:p-12 max-w-2xl mx-auto">
+    
+    <div class="forge-bg"></div>
+
+    <header class="mb-10 text-center md:text-left">
+        <button onclick="window.location.href='index.html'" class="mono-text text-[10px] uppercase opacity-40 hover:opacity-100 hover:text-[#00F2FF] transition-all cursor-pointer">
+            ← Return to Sanctum
+        </button>
+        <h1 class="lux-serif text-3xl mt-4" style="text-shadow: 0 0 20px rgba(0, 242, 255, 0.15);">SYNAPTIC CONNECTIONS</h1>
+        <p class="mono-text text-xs opacity-50 mt-2 text-[#00F2FF]">Mind Map // Node Visualization Matrix</p>
+    </header>
+
+    <div class="mind-map-container">
+        <div class="core-node"></div>
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+             <p class="mono-text text-sm">AWAITING NODE INJECTION...</p>
+        </div>
+    </div>
+
+    <div class="action-grid lux-serif">
+        <button class="action-btn">
+            <span>+</span> NEW
+        </button>
+        <button class="action-btn btn-delete">
+            <span>×</span> DELETE
+        </button>
+        <button class="action-btn">
+            <span>↑</span> UPLOAD
+        </button>
+    </div>
+
+</body>
+</html>
