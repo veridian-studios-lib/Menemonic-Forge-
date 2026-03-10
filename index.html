@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mnemonic Forge | Cognitive Core</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         /* THE OBSIDIAN SPECTRUM */
         :root { 
@@ -22,115 +22,73 @@
             background-color: var(--void); 
             color: white; 
             margin: 0; 
-            overflow: hidden; /* THE LOCK - No vertical scrolling allowed */
+            overflow-x: hidden; 
         }
         
         .lux-serif { font-family: 'Cinzel', serif; letter-spacing: 0.2em; }
-        
-        /* The Void Background */
-        .forge-theme { 
+
+        /* Background Glow */
+        .forge-bg {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: radial-gradient(circle at center, #111111 0%, var(--void) 100%);
-            min-height: 100vh;
-            position: relative;
+            z-index: -1;
         }
 
-        /* Subtle Background Wave Animation (Ocean Floor) */
-        .ocean-glow {
-            position: absolute;
-            bottom: -20%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 150vw;
-            height: 50vh;
-            background: radial-gradient(ellipse at center, rgba(0,242,255,0.05) 0%, rgba(5,5,5,0) 70%);
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        /* THE HORIZONTAL SHELF (Matches the Archive's scroll mechanic) */
-        .module-horizontal {
-            display: flex;
-            gap: 40px;
-            overflow-x: auto;
-            padding: 40px 100px 100px 100px;
-            scroll-snap-type: x mandatory;
-            scrollbar-width: none; /* Firefox */
-            z-index: 10;
-            position: relative;
-        }
-        .module-horizontal::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
-
-        /* The Module "Artifacts" (Glassmorphism Cards) */
-        .forge-module {
-            scroll-snap-align: center;
-            min-width: 280px;
-            height: 400px;
+        /* Glassmorphism Menu Item (Adapted from Dashboard.html) */
+        .menu-item {
             background: var(--glass);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px; /* Luxurious rounded corners */
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            cursor: pointer;
-            transition: 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            align-items: center;
-            padding: 40px 20px;
-            position: relative;
+            padding: 25px 30px; 
+            border-radius: 12px; 
+            margin-bottom: 20px;
+            cursor: pointer; 
+            transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
         }
         
-        .forge-module:hover {
-            transform: translateY(-20px) scale(1.02);
-            border-color: rgba(0, 242, 255, 0.3);
-            box-shadow: 0 30px 60px rgba(0, 242, 255, 0.1);
+        .menu-item:hover { 
+            border-color: rgba(0, 242, 255, 0.3); 
+            transform: translateY(-4px); 
+            box-shadow: 0 15px 35px rgba(0, 242, 255, 0.08); 
         }
 
-        .module-icon {
-            font-size: 3rem;
-            margin-bottom: auto;
-            text-shadow: 0 0 20px rgba(255,255,255,0.2);
-        }
-
-        .module-title {
-            font-family: 'Cinzel', serif;
-            font-size: 1.2rem;
-            color: white;
-            text-align: center;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-        }
-
-        /* HUB CONTAINER (Identical mechanic to Archive) */
+        /* Bloom Hub - Bottom Left */
         .hub-container {
             position: fixed; bottom: 40px; left: 40px; z-index: 100;
-            display: flex; flex-direction: column; align-items: center; gap: 20px;
+            display: flex; flex-direction: column; align-items: flex-start; gap: 15px;
         }
         .hub-btn { 
-            width: 75px; height: 75px; background: var(--glass); color: var(--cyan); 
+            width: 65px; height: 65px; background: var(--glass); color: var(--cyan); 
             backdrop-filter: blur(20px); border: 1px solid var(--glass-border);
             border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-            font-size: 2.5rem; box-shadow: 0 15px 40px rgba(0,242,255,0.1); cursor: pointer;
-            transition: transform 0.5s;
+            font-size: 2.2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.8); cursor: pointer;
+            transition: transform 0.4s, color 0.3s, border-color 0.3s;
         }
         .menu-bloom { 
-            display: flex; flex-direction: column; gap: 15px; 
-            transition: 0.5s; opacity: 0; pointer-events: none; transform: translateY(20px); 
+            display: flex; flex-direction: column; gap: 12px; 
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); 
+            opacity: 0; pointer-events: none; transform: translateY(20px); 
         }
         .menu-bloom.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
         
         .sub-btn { 
-            width: 70px; height: 70px; border-radius: 50%; background: var(--glass); 
+            padding: 12px 24px; border-radius: 8px; background: var(--glass); 
             color: white; display: flex; align-items: center; justify-content: center; 
-            font-size: 0.65rem; font-weight: bold; font-family: 'JetBrains Mono', monospace;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.6);
+            font-size: 0.75rem; font-weight: 600; letter-spacing: 1px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5); text-transform: uppercase;
             border: 1px solid var(--glass-border); cursor: pointer; transition: 0.3s;
+            white-space: nowrap;
         }
-        .sub-btn:hover { background: rgba(0,242,255,0.1); color: var(--cyan); border-color: var(--cyan); transform: scale(1.1); }
+        .sub-btn:hover { background: rgba(0,242,255,0.1); color: var(--cyan); border-color: var(--cyan); }
     </style>
 </head>
 <body>
+
+    <div class="forge-bg"></div>
 
     <div id="quote-screen" class="fixed inset-0 z-[200] flex flex-col items-center justify-center text-center px-10 bg-[#050505] transition-opacity duration-1000" onclick="enterForge()">
         <p class="text-xl md:text-2xl mb-10 text-[rgba(255,255,255,0.8)]" style="font-family: 'Cinzel', serif; max-width: 800px; line-height: 1.8;">
@@ -139,52 +97,61 @@
         <span class="lux-serif text-xs opacity-40 animate-pulse text-[#00F2FF]">TOUCH TO STEP INSIDE</span>
     </div>
 
-    <div id="main-gallery" class="hidden opacity-0 transition-opacity duration-1000 forge-theme h-screen flex flex-col">
-        <div class="ocean-glow"></div>
+    <div id="main-gallery" class="hidden opacity-0 transition-opacity duration-1000 p-8 pt-20 pb-32 max-w-2xl mx-auto min-h-screen flex flex-col relative z-10">
         
-        <header class="text-center pt-20 pb-4 z-10">
-            <h1 class="lux-serif text-4xl md:text-5xl text-white mb-2" style="text-shadow: 0 0 20px rgba(0, 242, 255, 0.2);">MNEMONIC FORGE</h1>
-            <p class="text-[rgba(255,255,255,0.4)]" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">COGNITIVE OPERATING SYSTEM V1</p>
+        <header class="text-center mb-12">
+            <h1 class="lux-serif text-3xl md:text-4xl text-white tracking-widest" style="text-shadow: 0 0 20px rgba(0, 242, 255, 0.15);">MNEMONIC FORGE</h1>
         </header>
 
-        <div id="shelf" class="module-horizontal flex-1 flex items-center">
-            
-            <div class="forge-module" onclick="window.location.href='cosmic-web.html'">
-                <span class="module-icon">☁️</span>
-                <span class="module-title">Cosmic Web</span>
+        <div class="menu-item" onclick="window.location.href='cosmic-web.html'">
+            <div>
+                <h2 class="lux-serif text-lg text-white mb-1">COSMIC WEB</h2>
+                <p class="text-[11px] opacity-60 font-mono tracking-wider text-[#00F2FF]">Spatial data synthesis & 3D memory</p>
             </div>
-            
-            <div class="forge-module">
-                <span class="module-icon">🌱</span>
-                <span class="module-title">Garden of Virtues</span>
-            </div>
-            
-            <div class="forge-module">
-                <span class="module-icon">⚡</span>
-                <span class="module-title">P-Realm Accelerator</span>
-            </div>
-            
-            <div class="forge-module">
-                <span class="module-icon">♟️</span>
-                <span class="module-title">Game Matrix</span>
-            </div>
-            
-            <div class="forge-module">
-                <span class="module-icon">🕸️</span>
-                <span class="module-title">Connections</span>
-            </div>
-
+            <span class="text-3xl filter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">☁️</span>
         </div>
 
-        <div class="hub-container">
-            <div id="bloom" class="menu-bloom">
-                <button class="sub-btn" onclick="window.location.href='https://veridian-studios-lib.github.io/Veridian-Archive/'">ARCHIVE</button>
-                <button class="sub-btn">TOOLS</button>
-                <button class="sub-btn">GEMINI</button>
+        <div class="menu-item">
+            <div>
+                <h2 class="lux-serif text-lg text-white mb-1">GARDEN OF VIRTUES</h2>
+                <p class="text-[11px] opacity-60 font-mono tracking-wider">Cultivate character and ethics</p>
             </div>
-            <div class="hub-btn" onclick="toggleMenu()">
-                <span id="plus" style="transition: 0.5s;">+</span>
+            <span class="text-3xl filter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">🌱</span>
+        </div>
+
+        <div class="menu-item">
+            <div>
+                <h2 class="lux-serif text-lg text-white mb-1">P-REALM ACCELERATOR</h2>
+                <p class="text-[11px] opacity-60 font-mono tracking-wider">High-performance study engine</p>
             </div>
+            <span class="text-3xl filter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">⚡</span>
+        </div>
+
+        <div class="menu-item">
+            <div>
+                <h2 class="lux-serif text-lg text-white mb-1">GAME MATRIX</h2>
+                <p class="text-[11px] opacity-60 font-mono tracking-wider">Cognitive simulation and strategy</p>
+            </div>
+            <span class="text-3xl filter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">♟️</span>
+        </div>
+
+        <div class="menu-item">
+            <div>
+                <h2 class="lux-serif text-lg text-white mb-1">CONNECTIONS</h2>
+                <p class="text-[11px] opacity-60 font-mono tracking-wider">Synaptic links and deep logic</p>
+            </div>
+            <span class="text-3xl filter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">🕸️</span>
+        </div>
+
+    </div>
+
+    <div class="hub-container">
+        <div id="bloom" class="menu-bloom">
+            <button class="sub-btn" onclick="window.location.href='origins.html'">ORIGINS</button>
+            <button class="sub-btn">OTHER APPS</button>
+        </div>
+        <div class="hub-btn" onclick="toggleMenu()">
+            <span id="plus" style="transition: transform 0.4s;">+</span>
         </div>
     </div>
 
@@ -207,15 +174,13 @@
             bloom.classList.toggle('active');
             
             if (bloom.classList.contains('active')) {
-                plus.innerHTML = "×";
-                plus.style.color = "var(--entropy)"; // Turns Red to close
+                plus.style.transform = "rotate(45deg)"; // Creates an 'X'
+                hubBtn.style.color = "var(--entropy)";  // Turns red
                 hubBtn.style.borderColor = "var(--entropy)";
-                hubBtn.style.boxShadow = "0 15px 40px rgba(255,49,49,0.1)";
             } else {
-                plus.innerHTML = "+";
-                plus.style.color = "var(--cyan)"; // Back to Cyan
+                plus.style.transform = "rotate(0deg)"; // Back to '+'
+                hubBtn.style.color = "var(--cyan)";    // Back to cyan
                 hubBtn.style.borderColor = "var(--glass-border)";
-                hubBtn.style.boxShadow = "0 15px 40px rgba(0,242,255,0.1)";
             }
         }
     </script>
