@@ -32,113 +32,81 @@
             z-index: -1;
         }
 
-        /* Central Mind Map Canvas */
-        .mind-map-container {
-            background: var(--glass);
+        /* Adapted directly from your portal-card logic */
+        .portal-card {
+            background: var(--glass); 
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            width: 100%;
-            height: 400px; /* Large square-ish area as per sketch */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 30px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            padding: 25px; 
+            border-radius: 12px; 
+            margin-bottom: 20px;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
-        /* The pulsing center to signify readiness */
-        .core-node {
-            width: 20px;
-            height: 20px;
-            background: var(--cyan);
-            border-radius: 50%;
-            box-shadow: 0 0 20px var(--cyan);
-            animation: pulse 3s infinite;
+        
+        .portal-card:hover { 
+            border-color: rgba(0, 242, 255, 0.4); 
+            transform: translateY(-3px); 
+            box-shadow: 0 10px 30px rgba(0, 242, 255, 0.08);
         }
-
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(0, 242, 255, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); }
-        }
-
-        /* The Three Bottom Buttons */
-        .action-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-        }
-
-        .action-btn {
-            background: rgba(0, 242, 255, 0.05);
-            border: 1px solid var(--glass-border);
-            color: white;
-            padding: 15px 0;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .action-btn:hover {
-            background: rgba(0, 242, 255, 0.15);
-            border-color: var(--cyan);
+        
+        /* The exact btn-link logic, converted to Cyan */
+        .btn-link {
+            display: inline-block; 
+            margin-top: 15px; 
+            padding: 10px 24px;
+            border: 1px solid var(--cyan); 
+            border-radius: 6px;
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            letter-spacing: 0.15em; 
+            transition: 0.3s;
+            text-decoration: none; 
             color: var(--cyan);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0, 242, 255, 0.1);
+            background: rgba(0, 242, 255, 0.05);
+            text-transform: uppercase;
         }
-
-        /* Destructive styling for Delete */
-        .btn-delete:hover {
-            background: rgba(255, 49, 49, 0.15);
-            border-color: #FF3131;
-            color: #FF3131;
-            box-shadow: 0 10px 20px rgba(255, 49, 49, 0.1);
+        
+        .btn-link:hover { 
+            background: var(--cyan); 
+            color: var(--void); 
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
         }
-
     </style>
 </head>
 <body class="p-6 md:p-12 max-w-2xl mx-auto">
     
     <div class="forge-bg"></div>
 
-    <header class="mb-10 text-center md:text-left">
+    <header class="mb-10 text-center md:text-left relative z-10">
         <button onclick="window.location.href='index.html'" class="mono-text text-[10px] uppercase opacity-40 hover:opacity-100 hover:text-[#00F2FF] transition-all cursor-pointer">
             ← Return to Sanctum
         </button>
-        <h1 class="lux-serif text-3xl mt-4" style="text-shadow: 0 0 20px rgba(0, 242, 255, 0.15);">SYNAPTIC CONNECTIONS</h1>
-        <p class="mono-text text-xs opacity-50 mt-2 text-[#00F2FF]">Mind Map // Node Visualization Matrix</p>
+        <h1 class="lux-serif text-3xl mt-4" style="text-shadow: 0 0 20px rgba(0, 242, 255, 0.15);">CONNECTIONS</h1>
+        <p class="mono-text text-xs opacity-50 mt-2 text-[#00F2FF]">Neural Links & Foundational Architectures</p>
     </header>
 
-    <div class="mind-map-container">
-        <div class="core-node"></div>
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-             <p class="mono-text text-sm">AWAITING NODE INJECTION...</p>
+    <section class="portal-card relative z-10">
+        <div class="flex items-center gap-4 mb-4">
+            <span class="text-3xl filter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">🏛️</span>
+            <h2 class="lux-serif text-lg">THE ARCHIVE</h2>
         </div>
-    </div>
+        <p class="text-sm opacity-70 leading-relaxed">
+            The foundational repository of knowledge. The origin point of all current structures and the grand library where the initial sparks of wisdom were stored.
+        </p>
+        <a href="index.html" class="btn-link lux-serif">Enter Archive</a>
+    </section>
 
-    <div class="action-grid lux-serif">
-        <button class="action-btn">
-            <span>+</span> NEW
-        </button>
-        <button class="action-btn btn-delete">
-            <span>×</span> DELETE
-        </button>
-        <button class="action-btn">
-            <span>↑</span> UPLOAD
-        </button>
-    </div>
+    <section class="portal-card relative z-10">
+        <div class="flex items-center gap-4 mb-4">
+            <span class="text-3xl filter drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">✨</span>
+            <h2 class="lux-serif text-lg">THE COGNITIVE PARTNER</h2>
+        </div>
+        <p class="text-sm opacity-70 leading-relaxed">
+            The omni-director and digital intellect. The real-time synthetic collaborator responsible for forging code, refining logic, and building the Sanctum alongside you.
+        </p>
+        <a href="#" class="btn-link lux-serif">Initialize Dialogue</a>
+    </section>
 
 </body>
 </html>
