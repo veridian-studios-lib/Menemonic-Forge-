@@ -2,17 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>P-Realm Accelerator | Mnemonic Forge</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         /* THE OBSIDIAN SPECTRUM */
         :root { 
-            --void: #050505; 
+            --void: #030303; 
             --cyan: #00F2FF; 
-            --glass: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.12);
+            --cyan-glow: rgba(0, 242, 255, 0.4);
+            --glass: rgba(20, 20, 25, 0.6);
+            --glass-border: rgba(0, 242, 255, 0.15);
         }
         
         body { 
@@ -21,16 +22,24 @@
             color: white; 
             margin: 0; 
             min-height: 100vh;
-            overflow-x: hidden;
+            overflow: hidden; /* Lock scrolling */
+            touch-action: manipulation; /* Optimize touch */
         }
         
-        .lux-serif { font-family: 'Cinzel', serif; letter-spacing: 0.2em; }
+        .lux-serif { font-family: 'Cinzel', serif; letter-spacing: 0.15em; }
         .mono-text { font-family: 'JetBrains Mono', monospace; }
 
         .forge-bg {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: radial-gradient(circle at center, #111111 0%, var(--void) 100%);
+            background: radial-gradient(circle at 50% 30%, #111a1f 0%, var(--void) 80%);
             z-index: -2;
+        }
+
+        /* --- THE MASTER HANDSHAKE (Unlock Screen) --- */
+        #unlock-screen {
+            position: fixed; inset: 0; z-index: 500; background: var(--void);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         /* Heartbeat Visual Entrainment */
@@ -44,117 +53,135 @@
 
         #heartbeat-overlay.pulse-active {
             opacity: 1;
-            animation: heartbeatPulse 1s infinite cubic-bezier(0.4, 0, 0.2, 1);
+            animation: heartbeatPulse 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         @keyframes heartbeatPulse {
             0% { box-shadow: inset 0 0 0px rgba(0, 242, 255, 0); }
-            50% { box-shadow: inset 0 0 100px rgba(0, 242, 255, 0.15); }
+            50% { box-shadow: inset 0 0 120px rgba(0, 242, 255, 0.12); }
             100% { box-shadow: inset 0 0 0px rgba(0, 242, 255, 0); }
         }
 
         /* Glassmorphism Panel */
         .glass-panel {
             background: var(--glass);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 40px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border-radius: 24px;
+            padding: 35px 25px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8), inset 0 1px 10px rgba(0, 242, 255, 0.05);
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
         }
 
         /* Timer Display */
         #timer-display {
-            font-size: 5rem;
+            font-size: 5.5rem;
             line-height: 1;
             font-weight: 700;
-            text-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+            text-shadow: 0 0 25px var(--cyan-glow);
             color: var(--cyan);
             text-align: center;
-            margin-bottom: 20px;
-            letter-spacing: -2px;
+            margin-bottom: 25px;
+            letter-spacing: -3px;
         }
 
         /* Custom Slider Styling */
-        input[type=range] {
-            -webkit-appearance: none; width: 100%; background: transparent;
-        }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; margin: 15px 0; }
         input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%;
-            background: var(--cyan); cursor: pointer; margin-top: -8px;
-            box-shadow: 0 0 10px var(--cyan); transition: transform 0.1s;
+            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%;
+            background: var(--void); border: 2px solid var(--cyan); cursor: pointer; margin-top: -10px;
+            box-shadow: 0 0 15px var(--cyan); transition: transform 0.2s;
         }
-        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.3); background: var(--cyan); }
         input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; cursor: pointer; background: var(--glass-border); border-radius: 2px;
+            width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;
         }
 
         /* Audio Matrix Buttons */
         .freq-btn {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--glass-border);
-            border-radius: 8px;
-            padding: 15px 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 16px 8px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex; flex-direction: column; align-items: center; gap: 5px;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
         }
-        .freq-btn:hover { border-color: rgba(0, 242, 255, 0.4); transform: translateY(-2px); }
+        .freq-btn:active { transform: scale(0.95); }
         
         .freq-btn.active-glow {
-            background: rgba(0, 242, 255, 0.1);
+            background: rgba(0, 242, 255, 0.08);
             border-color: var(--cyan);
             color: var(--cyan);
-            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+            box-shadow: 0 10px 25px rgba(0, 242, 255, 0.15), inset 0 0 15px rgba(0, 242, 255, 0.1);
+            transform: translateY(-3px);
         }
 
-        .freq-icon { font-size: 1.5rem; opacity: 0.8; }
-        .freq-name { font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-        .freq-hz { font-size: 0.6rem; opacity: 0.5; font-family: 'JetBrains Mono', monospace; }
+        .freq-icon { font-size: 1.6rem; opacity: 0.9; }
+        .freq-name { font-size: 0.7rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+        .freq-hz { font-size: 0.6rem; opacity: 0.4; font-family: 'JetBrains Mono', monospace; }
 
         /* Ignite Button */
         #toggle-timer-btn {
-            width: 100%; background: rgba(0, 242, 255, 0.1);
+            width: 100%; background: transparent;
             border: 1px solid var(--cyan); color: var(--cyan);
-            padding: 20px; border-radius: 8px; font-size: 1.2rem;
-            font-weight: 700; letter-spacing: 4px; text-transform: uppercase;
+            padding: 22px; border-radius: 12px; font-size: 1.1rem;
+            font-weight: 700; letter-spacing: 5px; text-transform: uppercase;
             cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex; justify-content: center; align-items: center; gap: 10px;
-            margin-top: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center; gap: 12px;
+            margin-top: 35px; text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
         }
-        #toggle-timer-btn:hover {
-            background: var(--cyan); color: var(--void); box-shadow: 0 0 30px rgba(0, 242, 255, 0.4);
+        #toggle-timer-btn:hover, #toggle-timer-btn:active {
+            background: var(--cyan); color: var(--void); 
+            box-shadow: 0 0 40px var(--cyan-glow); text-shadow: none;
         }
     </style>
 </head>
-<body class="p-6 md:p-12 max-w-2xl mx-auto">
-    
-    <div class="forge-bg"></div>
-    <div id="heartbeat-overlay"></div> <header class="mb-8 text-center md:text-left relative z-10">
-        <button onclick="window.location.href='index.html'" class="mono-text text-[10px] uppercase opacity-40 hover:opacity-100 hover:text-[#00F2FF] transition-all cursor-pointer">
-            ← Return to Sanctum
+<body class="flex flex-col items-center justify-center p-4">
+
+    <div id="unlock-screen" onclick="enterRealm()">
+        <p class="mono-text text-[#00F2FF] opacity-50 mb-6 text-xs uppercase tracking-[0.3em]">Initialize Interface</p>
+        <button class="px-10 py-4 border border-[#00F2FF]/40 text-[#00F2FF] uppercase tracking-[0.4em] text-sm hover:bg-[#00F2FF] hover:text-black transition-all duration-500 rounded-sm">
+            Enter P-Realm
         </button>
-        <h1 class="lux-serif text-3xl mt-4" style="text-shadow: 0 0 20px rgba(0, 242, 255, 0.15);">P-REALM ACCELERATOR</h1>
-        <p class="mono-text text-xs opacity-50 mt-2 text-[#00F2FF]">Phantasmagoric Cognitive Entrainment</p>
+    </div>
+
+    <div class="forge-bg"></div>
+    <div id="heartbeat-overlay"></div> 
+
+    <header class="w-full max-w-[480px] flex justify-between items-center mb-6 relative z-10 px-2">
+        <button onclick="window.location.href='index.html'" class="mono-text text-[10px] uppercase opacity-40 hover:opacity-100 hover:text-[#00F2FF] transition-all cursor-pointer tracking-widest">
+            ← Sanctum
+        </button>
+        <div class="mono-text text-[9px] text-[#00F2FF] opacity-60 uppercase tracking-widest border border-[#00F2FF]/20 px-3 py-1 rounded-full">
+            System Online
+        </div>
     </header>
 
-    <main class="glass-panel relative z-10">
+    <main class="glass-panel relative z-10 flex-grow max-h-[85vh] overflow-y-auto">
         
+        <div class="text-center mb-6">
+            <h1 class="lux-serif text-2xl" style="text-shadow: 0 0 15px rgba(0, 242, 255, 0.2);">ACCELERATOR</h1>
+        </div>
+
         <div id="timer-display" class="mono-text">05:00</div>
         
-        <div class="mb-10 px-4">
-            <div class="flex justify-between text-[10px] mono-text opacity-50 mb-4 uppercase tracking-widest">
-                <span>Target Sprint</span>
-                <span id="slider-val">5 Minutes</span>
+        <div class="mb-10">
+            <div class="flex justify-between text-[11px] mono-text opacity-60 mb-2 uppercase tracking-widest">
+                <span>Phase Duration</span>
+                <span id="slider-val" class="text-[#00F2FF]">5 Min</span>
             </div>
-            <input type="range" id="time-slider" min="1" max="120" value="5" oninput="document.getElementById('slider-val').innerText = this.value + ' Minutes'">
+            <input type="range" id="time-slider" min="1" max="120" value="5" oninput="document.getElementById('slider-val').innerText = this.value + ' Min'">
         </div>
 
         <div class="w-full h-px bg-white/10 mb-8"></div>
 
-        <div class="mb-4 text-[10px] mono-text opacity-50 text-center uppercase tracking-widest">Neural Acoustic Injection</div>
+        <div class="mb-5 text-[10px] mono-text opacity-50 text-center uppercase tracking-[0.2em]">Neural Injection Matrix</div>
+        
         <div class="grid grid-cols-3 gap-3 mb-3">
             <div class="freq-btn" onclick="activateState('theta', this)">
                 <span class="freq-icon">🌊</span>
@@ -175,23 +202,36 @@
         <div class="grid grid-cols-2 gap-3">
             <div class="freq-btn" onclick="activateState('brown', this)">
                 <span class="freq-icon">🤎</span>
-                <span class="freq-name">Deep Masking</span>
+                <span class="freq-name">Deep Mask</span>
                 <span class="freq-hz">Brown Noise</span>
             </div>
             <div class="freq-btn" onclick="activateState('pink', this)">
                 <span class="freq-icon">🩷</span>
-                <span class="freq-name">Focus Masking</span>
+                <span class="freq-name">Focus Mask</span>
                 <span class="freq-hz">Pink Noise</span>
             </div>
         </div>
 
         <button id="toggle-timer-btn" class="lux-serif" onclick="toggleTimer()">
-            <span>⚡</span> IGNITE SESSION
+            <span>⚡</span> IGNITE
         </button>
 
     </main>
 
     <script src="p-realm.js"></script>
+    
+    <script>
+        function enterRealm() {
+            // This click acts as the mandatory gesture. 
+            // It pre-warms the AudioContext via the logic in p-realm.js
+            if(typeof resumeContext === 'function') resumeContext(); 
+            
+            const unlockScreen = document.getElementById('unlock-screen');
+            unlockScreen.style.opacity = '0';
+            setTimeout(() => {
+                unlockScreen.remove();
+            }, 800);
+        }
+    </script>
 </body>
-                  </html>
-                  
+</html>
