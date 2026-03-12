@@ -1,16 +1,16 @@
 /**
- * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR
- * PHYSICS PATCH: Frequency Optimization & Anti-Clip Noise Engine
+ * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR (ULTIMATE PERSISTENCE)
+ * Features: Inline Web Worker Timer, MediaSession API, Non-Zero Heartbeat, 
+ * Timestamp Sync, Solfeggio Carriers, Anti-Clip Noise.
  */
 
 let audioCtx = null;
 let currentAudioNodes = [];
-let timerInterval = null;
-let timeRemaining = 300; 
 let isTimerRunning = false;
 let activeFrequency = null;
 let heartbeat = null;
 let wakeLock = null;
+let timeRemaining = 300; 
 
 // DOM Elements
 const timerDisplay = document.getElementById('timer-display');
@@ -18,47 +18,106 @@ const timeSlider = document.getElementById('time-slider');
 const toggleTimerBtn = document.getElementById('toggle-timer-btn');
 const heartbeatOverlay = document.getElementById('heartbeat-overlay');
 
-// --- 1. WAKE LOCK ---
+// --- 1. THE INLINE WEB WORKER (Bulletproof Background Timer) ---
+// We create a worker from a string so no external file is needed.
+const workerCode = `
+    let timerId = null;
+    self.onmessage = function(e) {
+        if (e.data.command === 'start') {
+            const endTime = Date.now() + (e.data.duration * 1000);
+            timerId = setInterval(() => {
+                const remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+                if (remaining <= 0) {
+                    clearInterval(timerId);
+                    self.postMessage({ status: 'done', remaining: 0 });
+                } else {
+                    self.postMessage({ status: 'tick', remaining: remaining });
+                }
+            }, 1000);
+        } else if (e.data.command === 'stop') {
+            clearInterval(timerId);
+        }
+    };
+`;
+const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+const timerWorker = new Worker(URL.createObjectURL(workerBlob));
+
+timerWorker.onmessage = function(e) {
+    timeRemaining = e.data.remaining;
+    updateTimerDisplay();
+    if (e.data.status === 'done') {
+        completeSession();
+    }
+};
+
+// --- 2. THE WAKE LOCK & MEDIA SESSION API ---
 async function requestWakeLock() {
     if ('wakeLock' in navigator) {
         try {
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log("P-Realm: Cognitive Lock Active");
+            console.log("P-Realm: Hardware Screen Lock Engaged");
         } catch (err) {
-            console.error("Wake Lock Error:", err);
+            console.log("Wake Lock constrained by battery saver:", err.message);
         }
     }
 }
 
+function setupMediaSession() {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Neural Injection Active',
+            artist: 'P-Realm Accelerator',
+            album: 'Veridian Sanctum'
+        });
+        // Dummy handlers to convince the OS this is a real media player
+        navigator.mediaSession.setActionHandler('play', () => { resumeContext(); });
+        navigator.mediaSession.setActionHandler('pause', () => { /* Prevent pause */ });
+    }
+}
+
 document.addEventListener('visibilitychange', async () => {
-    if (wakeLock !== null && document.visibilityState === 'visible' && isTimerRunning) {
-        await requestWakeLock();
+    if (document.visibilityState === 'visible' && isTimerRunning) {
+        if (wakeLock === null) await requestWakeLock();
+        updateTimerDisplay(); // Force UI resync on wake
     }
 });
 
-// --- 2. AUDIO CONTEXT MASTER CONTROL ---
+// --- 3. AUDIO CONTEXT & NON-ZERO HEARTBEAT ---
 function resumeContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        setupMediaSession();
     }
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
 }
 
-// Binds to all touches to force audio unlock
 window.addEventListener('touchstart', resumeContext, { passive: true });
 window.addEventListener('mousedown', resumeContext, { passive: true });
 
-// --- 3. BACKGROUND PERSISTENCE ---
 function startHeartbeat() {
     if (!audioCtx) return;
     stopHeartbeat(); 
-    const silence = audioCtx.createBuffer(1, 44100, 44100);
+    
+    // METHOD 4: Non-Zero White Noise Heartbeat
+    // Browsers kill pure silence. We use 0.0001 volume noise.
+    const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1; 
+    }
+
     heartbeat = audioCtx.createBufferSource();
-    heartbeat.buffer = silence;
+    heartbeat.buffer = noiseBuffer;
     heartbeat.loop = true;
-    heartbeat.connect(audioCtx.destination);
+    
+    const hbGain = audioCtx.createGain();
+    hbGain.gain.value = 0.0001; // Imperceptible, but keeps the audio thread alive
+
+    heartbeat.connect(hbGain);
+    hbGain.connect(audioCtx.destination);
     heartbeat.start();
 }
 
@@ -79,34 +138,28 @@ function stopAllAudio() {
     document.querySelectorAll('.freq-btn').forEach(btn => btn.classList.remove('active-glow'));
 }
 
-// --- 4. NEURAL AUDIO GENERATION (PHYSICS FIXED) ---
+// --- 4. NEURAL AUDIO GENERATION ---
 function playIsochronicTone(baseFreq, pulseHz) {
     resumeContext(); 
     stopAllAudio();
     startHeartbeat(); 
 
-    // Using a 'triangle' wave alongside sine makes it vastly easier to hear on mobile speakers
     const oscillator = audioCtx.createOscillator();
-    oscillator.type = 'triangle'; 
+    oscillator.type = 'triangle'; // High-penetration for mobile speakers
     oscillator.frequency.value = baseFreq;
 
     const lfo = audioCtx.createOscillator();
     lfo.type = 'sine';
     lfo.frequency.value = pulseHz; 
 
-    // Master Volume of the Tone
     const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.5; // Base Volume
+    gainNode.gain.value = 0.5; 
 
-    // LFO Amplitude Modulation Depth
     const lfoGain = audioCtx.createGain();
-    lfoGain.gain.value = 0.5; // Swings the volume up and down perfectly
+    lfoGain.gain.value = 0.5; 
     
-    // Connect Modulation
     lfo.connect(lfoGain);
     lfoGain.connect(gainNode.gain); 
-    
-    // Connect Audio to Output
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
@@ -125,18 +178,14 @@ function playNoise(type) {
     const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
 
-    // ANTI-CLIP NOISE ALGORITHM
     let lastOut = 0;
     for (let i = 0; i < bufferSize; i++) {
         let white = Math.random() * 2 - 1;
-        
         if (type === 'brown') {
-            // Safe leaky integrator for Brown Noise
             output[i] = (lastOut + (0.02 * white)) / 1.02;
             lastOut = output[i];
-            output[i] *= 2.0; // Reduced from 3.5 to prevent clipping
+            output[i] *= 2.0; 
         } else {
-            // Safe Pink Noise approximation
             output[i] = (lastOut * 0.9) + (white * 0.1);
             lastOut = output[i];
             output[i] *= 2.5; 
@@ -148,7 +197,7 @@ function playNoise(type) {
     noiseNode.loop = true;
     
     const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.6; // Safe Master Volume
+    gainNode.gain.value = 0.6; 
 
     noiseNode.connect(gainNode);
     gainNode.connect(audioCtx.destination);
@@ -165,8 +214,6 @@ function activateState(stateId, buttonElement) {
         return;
     }
 
-    // THE FREQUENCY FIX: Shifted to Solfeggio frequencies so phone speakers can project them.
-    // 432Hz, 528Hz, and 639Hz are highly audible, while maintaining the exact cognitive pulse (6, 10, 40)
     switch(stateId) {
         case 'gamma': playIsochronicTone(639, 40); break; 
         case 'alpha': playIsochronicTone(528, 10); break; 
@@ -180,7 +227,7 @@ function activateState(stateId, buttonElement) {
     buttonElement.classList.add('active-glow');
 }
 
-// --- 5. TEMPORAL ENGINE (SLIDER FIXED) ---
+// --- 5. TEMPORAL ENGINE CONTROL ---
 function updateTimerDisplay() {
     let minutes = Math.floor(timeRemaining / 60);
     let seconds = timeRemaining % 60;
@@ -190,30 +237,26 @@ function updateTimerDisplay() {
 function toggleTimer() {
     resumeContext();
     if (isTimerRunning) {
-        clearInterval(timerInterval);
+        // Stop Sequence
+        timerWorker.postMessage({ command: 'stop' });
         isTimerRunning = false;
         toggleTimerBtn.innerHTML = "<span>⚡</span> IGNITE SESSION";
         heartbeatOverlay.classList.remove('pulse-active');
         if (wakeLock) { wakeLock.release(); wakeLock = null; }
     } else {
+        // Start Sequence
         isTimerRunning = true;
         requestWakeLock(); 
+        
+        // Delegate timing to the Web Worker
+        timerWorker.postMessage({ command: 'start', duration: timeRemaining });
+        
         toggleTimerBtn.innerHTML = "<span>⏸</span> PAUSE MATRIX";
         heartbeatOverlay.classList.add('pulse-active');
-        
-        timerInterval = setInterval(() => {
-            if (timeRemaining > 0) {
-                timeRemaining--;
-                updateTimerDisplay();
-            } else {
-                completeSession();
-            }
-        }, 1000);
     }
 }
 
 function completeSession() {
-    clearInterval(timerInterval);
     isTimerRunning = false;
     stopAllAudio();
     stopHeartbeat();
@@ -235,10 +278,12 @@ function completeSession() {
     chime.stop(audioCtx.currentTime + 1.5);
 }
 
-// SLIDER LOGIC FIX: Instant UI updates while dragging
+// Slider controls time ONLY when paused/stopped
 if(timeSlider) {
     timeSlider.addEventListener('input', (e) => {
-        timeRemaining = parseInt(e.target.value) * 60;
-        updateTimerDisplay(); 
+        if (!isTimerRunning) {
+            timeRemaining = parseInt(e.target.value) * 60;
+            updateTimerDisplay(); 
+        }
     });
 }
