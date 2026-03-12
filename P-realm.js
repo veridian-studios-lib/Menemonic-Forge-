@@ -1,7 +1,6 @@
 /**
  * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR
- * Features: Math-based Isochronic Tones, Persistent Wake-Lock, 
- * Background Audio Heartbeat, and Universal Touch-Wake.
+ * Audio fixed: Carrier and Modulator routing stabilized.
  */
 
 let audioCtx = null;
@@ -13,62 +12,48 @@ let activeFrequency = null;
 let heartbeat = null;
 let wakeLock = null;
 
-// DOM Elements
 const timerDisplay = document.getElementById('timer-display');
 const timeSlider = document.getElementById('time-slider');
 const toggleTimerBtn = document.getElementById('toggle-timer-btn');
 const heartbeatOverlay = document.getElementById('heartbeat-overlay');
 
-// --- 1. THE WAKE LOCK (Prevents Screen Sleep) ---
 async function requestWakeLock() {
     if ('wakeLock' in navigator) {
         try {
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log("P-Realm: Cognitive Lock Active (Screen Stay-Awake)");
-            wakeLock.addEventListener('release', () => {
-                console.log("P-Realm: Cognitive Lock Released");
-                wakeLock = null;
-            });
         } catch (err) {
-            console.error(`P-Realm Wake Lock Error: ${err.name}, ${err.message}`);
+            console.error(`P-Realm Wake Lock Error: ${err.message}`);
         }
     }
 }
 
-// Re-request if app is minimized and restored
 document.addEventListener('visibilitychange', async () => {
     if (wakeLock !== null && document.visibilityState === 'visible' && isTimerRunning) {
         await requestWakeLock();
     }
 });
 
-// --- 2. THE AUDIO ENGINE & MASTER WAKE-UP ---
 function resumeContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.state === 'suspended') {
-        audioCtx.resume().then(() => {
-            console.log("Neural Audio Engine: ONLINE");
-        });
+        audioCtx.resume();
     }
 }
 
-// Attach wake-up to ANY touch on the screen (Silent Bypass)
 window.addEventListener('touchstart', resumeContext, { passive: true });
 window.addEventListener('mousedown', resumeContext, { passive: true });
 
-// --- 3. THE HEARTBEAT (Prevents OS Audio Suspension) ---
 function startHeartbeat() {
     if (!audioCtx) return;
-    stopHeartbeat(); // Clear existing
+    stopHeartbeat(); 
     const silence = audioCtx.createBuffer(1, 44100, 44100);
     heartbeat = audioCtx.createBufferSource();
     heartbeat.buffer = silence;
     heartbeat.loop = true;
     heartbeat.connect(audioCtx.destination);
     heartbeat.start();
-    console.log("P-Realm: Background Persistence Heartbeat Started");
 }
 
 function stopHeartbeat() {
@@ -79,7 +64,6 @@ function stopHeartbeat() {
     }
 }
 
-// --- 4. NEURAL AUDIO GENERATION ---
 function stopAllAudio() {
     currentAudioNodes.forEach(node => {
         try { node.stop(); } catch (e) {}
@@ -90,27 +74,35 @@ function stopAllAudio() {
     document.querySelectorAll('.freq-btn').forEach(btn => btn.classList.remove('active-glow'));
 }
 
+// THE FIX: Correct LFO Amplitude Modulation
 function playIsochronicTone(baseFreq, pulseHz) {
     resumeContext(); 
     stopAllAudio();
-    startHeartbeat(); // Keep thread alive
+    startHeartbeat(); 
 
+    // 1. The Carrier (The sound you hear: e.g., 200Hz)
     const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    const lfo = audioCtx.createOscillator();
-
     oscillator.type = 'sine';
     oscillator.frequency.value = baseFreq;
 
+    // 2. The Modulator (The pulse: e.g., 10Hz)
+    const lfo = audioCtx.createOscillator();
     lfo.type = 'sine';
     lfo.frequency.value = pulseHz; 
 
+    // 3. The Volume Control
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.5; // Base volume at 50%
+
+    // 4. The LFO Depth (How hard it pulses)
     const lfoGain = audioCtx.createGain();
-    lfoGain.gain.value = 0.5; 
+    lfoGain.gain.value = 0.5; // Modulate by 50% (creates the wah-wah effect)
     
+    // The Routing: LFO -> LFO Gain -> Main Gain's AudioParam
     lfo.connect(lfoGain);
     lfoGain.connect(gainNode.gain); 
     
+    // Oscillator -> Main Gain -> Speakers
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
@@ -123,7 +115,7 @@ function playIsochronicTone(baseFreq, pulseHz) {
 function playNoise(type) {
     resumeContext();
     stopAllAudio();
-    startHeartbeat(); // Keep thread alive
+    startHeartbeat(); 
 
     const bufferSize = 2 * audioCtx.sampleRate;
     const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
@@ -155,7 +147,8 @@ function playNoise(type) {
     noiseNode.loop = true;
     
     const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.4; 
+    // THE FIX: Increased base volume for noise
+    gainNode.gain.value = 0.8; 
 
     noiseNode.connect(gainNode);
     gainNode.connect(audioCtx.destination);
@@ -173,9 +166,9 @@ function activateState(stateId, buttonElement) {
     }
 
     switch(stateId) {
-        case 'gamma': playIsochronicTone(200, 40); break;
-        case 'alpha': playIsochronicTone(200, 10); break;
-        case 'theta': playIsochronicTone(150, 6); break;
+        case 'gamma': playIsochronicTone(200, 40); break; // Hear 200Hz, pulse 40x a sec
+        case 'alpha': playIsochronicTone(200, 10); break; // Hear 200Hz, pulse 10x a sec
+        case 'theta': playIsochronicTone(150, 6); break;  // Hear 150Hz, pulse 6x a sec
         case 'brown': playNoise('brown'); break;
         case 'pink': playNoise('pink'); break;
     }
@@ -185,7 +178,6 @@ function activateState(stateId, buttonElement) {
     buttonElement.classList.add('active-glow');
 }
 
-// --- 5. THE TEMPORAL ENGINE ---
 function updateTimerDisplay() {
     let minutes = Math.floor(timeRemaining / 60);
     let seconds = timeRemaining % 60;
@@ -202,7 +194,7 @@ function toggleTimer() {
         if (wakeLock) { wakeLock.release(); wakeLock = null; }
     } else {
         isTimerRunning = true;
-        requestWakeLock(); // Lock the screen awake
+        requestWakeLock(); 
         toggleTimerBtn.innerHTML = "<span>⏸</span> PAUSE MATRIX";
         heartbeatOverlay.classList.add('pulse-active');
         
@@ -239,9 +231,11 @@ function completeSession() {
     chime.stop(audioCtx.currentTime + 1.5);
 }
 
+// THE FIX: Ensure big numbers update live while dragging
 if(timeSlider) {
     timeSlider.addEventListener('input', (e) => {
-        timeRemaining = parseInt(e.target.value) * 60;
-        updateTimerDisplay();
+        let val = parseInt(e.target.value);
+        timeRemaining = val * 60;
+        updateTimerDisplay(); 
     });
-            }
+        }
