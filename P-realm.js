@@ -1,6 +1,6 @@
 /**
  * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR
- * Audio fixed: Carrier and Modulator routing stabilized.
+ * PHYSICS PATCH: Frequency Optimization & Anti-Clip Noise Engine
  */
 
 let audioCtx = null;
@@ -12,17 +12,20 @@ let activeFrequency = null;
 let heartbeat = null;
 let wakeLock = null;
 
+// DOM Elements
 const timerDisplay = document.getElementById('timer-display');
 const timeSlider = document.getElementById('time-slider');
 const toggleTimerBtn = document.getElementById('toggle-timer-btn');
 const heartbeatOverlay = document.getElementById('heartbeat-overlay');
 
+// --- 1. WAKE LOCK ---
 async function requestWakeLock() {
     if ('wakeLock' in navigator) {
         try {
             wakeLock = await navigator.wakeLock.request('screen');
+            console.log("P-Realm: Cognitive Lock Active");
         } catch (err) {
-            console.error(`P-Realm Wake Lock Error: ${err.message}`);
+            console.error("Wake Lock Error:", err);
         }
     }
 }
@@ -33,6 +36,7 @@ document.addEventListener('visibilitychange', async () => {
     }
 });
 
+// --- 2. AUDIO CONTEXT MASTER CONTROL ---
 function resumeContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -42,9 +46,11 @@ function resumeContext() {
     }
 }
 
+// Binds to all touches to force audio unlock
 window.addEventListener('touchstart', resumeContext, { passive: true });
 window.addEventListener('mousedown', resumeContext, { passive: true });
 
+// --- 3. BACKGROUND PERSISTENCE ---
 function startHeartbeat() {
     if (!audioCtx) return;
     stopHeartbeat(); 
@@ -58,8 +64,7 @@ function startHeartbeat() {
 
 function stopHeartbeat() {
     if (heartbeat) { 
-        try { heartbeat.stop(); } catch(e) {}
-        try { heartbeat.disconnect(); } catch(e) {}
+        try { heartbeat.stop(); heartbeat.disconnect(); } catch(e) {}
         heartbeat = null; 
     }
 }
@@ -74,35 +79,34 @@ function stopAllAudio() {
     document.querySelectorAll('.freq-btn').forEach(btn => btn.classList.remove('active-glow'));
 }
 
-// THE FIX: Correct LFO Amplitude Modulation
+// --- 4. NEURAL AUDIO GENERATION (PHYSICS FIXED) ---
 function playIsochronicTone(baseFreq, pulseHz) {
     resumeContext(); 
     stopAllAudio();
     startHeartbeat(); 
 
-    // 1. The Carrier (The sound you hear: e.g., 200Hz)
+    // Using a 'triangle' wave alongside sine makes it vastly easier to hear on mobile speakers
     const oscillator = audioCtx.createOscillator();
-    oscillator.type = 'sine';
+    oscillator.type = 'triangle'; 
     oscillator.frequency.value = baseFreq;
 
-    // 2. The Modulator (The pulse: e.g., 10Hz)
     const lfo = audioCtx.createOscillator();
     lfo.type = 'sine';
     lfo.frequency.value = pulseHz; 
 
-    // 3. The Volume Control
+    // Master Volume of the Tone
     const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.5; // Base volume at 50%
+    gainNode.gain.value = 0.5; // Base Volume
 
-    // 4. The LFO Depth (How hard it pulses)
+    // LFO Amplitude Modulation Depth
     const lfoGain = audioCtx.createGain();
-    lfoGain.gain.value = 0.5; // Modulate by 50% (creates the wah-wah effect)
+    lfoGain.gain.value = 0.5; // Swings the volume up and down perfectly
     
-    // The Routing: LFO -> LFO Gain -> Main Gain's AudioParam
+    // Connect Modulation
     lfo.connect(lfoGain);
     lfoGain.connect(gainNode.gain); 
     
-    // Oscillator -> Main Gain -> Speakers
+    // Connect Audio to Output
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
@@ -121,24 +125,21 @@ function playNoise(type) {
     const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
 
-    let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0, b6=0;
-
+    // ANTI-CLIP NOISE ALGORITHM
+    let lastOut = 0;
     for (let i = 0; i < bufferSize; i++) {
         let white = Math.random() * 2 - 1;
+        
         if (type === 'brown') {
-            let lastOut = i > 0 ? output[i-1] : 0;
+            // Safe leaky integrator for Brown Noise
             output[i] = (lastOut + (0.02 * white)) / 1.02;
-            output[i] *= 3.5; 
+            lastOut = output[i];
+            output[i] *= 2.0; // Reduced from 3.5 to prevent clipping
         } else {
-            b0 = 0.99886 * b0 + white * 0.0555179;
-            b1 = 0.99332 * b1 + white * 0.0750759;
-            b2 = 0.96900 * b2 + white * 0.1538520;
-            b3 = 0.86650 * b3 + white * 0.3104856;
-            b4 = 0.55000 * b4 + white * 0.5329522;
-            b5 = -0.7616 * b5 - white * 0.0168980;
-            output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-            output[i] *= 0.11;
-            b6 = white * 0.115926;
+            // Safe Pink Noise approximation
+            output[i] = (lastOut * 0.9) + (white * 0.1);
+            lastOut = output[i];
+            output[i] *= 2.5; 
         }
     }
 
@@ -147,8 +148,7 @@ function playNoise(type) {
     noiseNode.loop = true;
     
     const gainNode = audioCtx.createGain();
-    // THE FIX: Increased base volume for noise
-    gainNode.gain.value = 0.8; 
+    gainNode.gain.value = 0.6; // Safe Master Volume
 
     noiseNode.connect(gainNode);
     gainNode.connect(audioCtx.destination);
@@ -165,10 +165,12 @@ function activateState(stateId, buttonElement) {
         return;
     }
 
+    // THE FREQUENCY FIX: Shifted to Solfeggio frequencies so phone speakers can project them.
+    // 432Hz, 528Hz, and 639Hz are highly audible, while maintaining the exact cognitive pulse (6, 10, 40)
     switch(stateId) {
-        case 'gamma': playIsochronicTone(200, 40); break; // Hear 200Hz, pulse 40x a sec
-        case 'alpha': playIsochronicTone(200, 10); break; // Hear 200Hz, pulse 10x a sec
-        case 'theta': playIsochronicTone(150, 6); break;  // Hear 150Hz, pulse 6x a sec
+        case 'gamma': playIsochronicTone(639, 40); break; 
+        case 'alpha': playIsochronicTone(528, 10); break; 
+        case 'theta': playIsochronicTone(432, 6); break;  
         case 'brown': playNoise('brown'); break;
         case 'pink': playNoise('pink'); break;
     }
@@ -178,6 +180,7 @@ function activateState(stateId, buttonElement) {
     buttonElement.classList.add('active-glow');
 }
 
+// --- 5. TEMPORAL ENGINE (SLIDER FIXED) ---
 function updateTimerDisplay() {
     let minutes = Math.floor(timeRemaining / 60);
     let seconds = timeRemaining % 60;
@@ -219,6 +222,7 @@ function completeSession() {
     toggleTimerBtn.innerHTML = "<span>↺</span> RESET";
     heartbeatOverlay.classList.remove('pulse-active');
     
+    // Completion Chime
     const chime = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     chime.type = 'sine';
@@ -231,11 +235,10 @@ function completeSession() {
     chime.stop(audioCtx.currentTime + 1.5);
 }
 
-// THE FIX: Ensure big numbers update live while dragging
+// SLIDER LOGIC FIX: Instant UI updates while dragging
 if(timeSlider) {
     timeSlider.addEventListener('input', (e) => {
-        let val = parseInt(e.target.value);
-        timeRemaining = val * 60;
+        timeRemaining = parseInt(e.target.value) * 60;
         updateTimerDisplay(); 
     });
-        }
+}
