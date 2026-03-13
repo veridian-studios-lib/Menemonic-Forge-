@@ -1,17 +1,18 @@
 /**
- * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR (ANDROID/CHROME OPTIMIZED)
- * Features: Native AudioContext, Delta-Time Sync, Solfeggio Tones
+ * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR (TITANIUM ANDROID BUILD)
+ * Integrating 10-Point Hardware Persistence Architecture
  */
 
 let audioCtx = null;
 let currentAudioNodes = [];
-let timerInterval = null;
-let endTime = null; // Used for Delta-Time tracking
-let timeRemaining = 300; 
 let isTimerRunning = false;
 let activeFrequency = null;
-let heartbeat = null;
 let wakeLock = null;
+let timeRemaining = 300; 
+
+// The Anchor Elements
+let anchorAudioElement = null;
+let mediaStreamDest = null;
 
 // DOM Elements
 const timerDisplay = document.getElementById('timer-display');
@@ -19,77 +20,128 @@ const timeSlider = document.getElementById('time-slider');
 const toggleTimerBtn = document.getElementById('toggle-timer-btn');
 const heartbeatOverlay = document.getElementById('heartbeat-overlay');
 
-// --- 1. ANDROID WAKE LOCK ---
+// --- POINT 6: DATA URI WEB WORKER (No external files needed, bypasses CSP) ---
+const workerCode = `
+    let timerId = null;
+    self.onmessage = function(e) {
+        if (e.data.command === 'start') {
+            const endTime = Date.now() + (e.data.duration * 1000);
+            timerId = setInterval(() => {
+                const remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+                if (remaining <= 0) {
+                    clearInterval(timerId);
+                    self.postMessage({ status: 'done', remaining: 0 });
+                } else {
+                    self.postMessage({ status: 'tick', remaining: remaining });
+                }
+            }, 1000);
+        } else if (e.data.command === 'stop') {
+            clearInterval(timerId);
+        }
+    };
+`;
+const workerUri = 'data:application/javascript,' + encodeURIComponent(workerCode);
+const timerWorker = new Worker(workerUri);
+
+timerWorker.onmessage = function(e) {
+    timeRemaining = e.data.remaining;
+    updateTimerDisplay();
+    if (e.data.status === 'done') completeSession();
+};
+
+// --- POINT 9: BATTERY STATUS CHECK ---
+if ('getBattery' in navigator) {
+    navigator.getBattery().then(battery => {
+        console.log(`System Power: ${Math.round(battery.level * 100)}%`);
+        battery.addEventListener('levelchange', () => {
+            if (battery.level <= 0.20 && !battery.charging) {
+                console.warn("WARNING: Battery critical. OS may terminate audio.");
+            }
+        });
+    });
+}
+
+// --- WAKE LOCK ---
 async function requestWakeLock() {
     if ('wakeLock' in navigator) {
         try {
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log("P-Realm: Android Screen Lock Engaged");
         } catch (err) {
-            console.error("Wake Lock failed:", err);
+            console.warn("Wake Lock Denied (Likely Power Saving Mode):", err.message);
         }
     }
 }
 
-document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState === 'visible' && isTimerRunning) {
-        if (wakeLock === null) await requestWakeLock();
-    }
-});
-
-// --- 2. AUDIO CONTEXT (PURE NATIVE) ---
-function resumeContext() {
-    // If context doesn't exist, create it. 
-    // Android Chrome requires this to happen inside a user gesture (like the Unlock button).
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        console.log("Audio Context Created");
-    }
-    
-    // If it's suspended, wake it up.
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume().then(() => {
-            console.log("Audio Context Resumed");
+// --- POINTS 2 & 3: MEDIA SESSION API ---
+function setupMediaSession() {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Neural Injection Active',
+            artist: 'P-Realm Accelerator',
+            album: 'Phase ' + (activeFrequency ? activeFrequency.toUpperCase() : 'STANDBY')
+        });
+        
+        navigator.mediaSession.setActionHandler('play', () => { 
+            if(!isTimerRunning) toggleTimer(); 
+        });
+        navigator.mediaSession.setActionHandler('pause', () => { 
+            if(isTimerRunning) toggleTimer(); 
         });
     }
 }
 
-// Ensure touching the screen keeps the context alive
-window.addEventListener('touchstart', resumeContext, { passive: true });
-window.addEventListener('mousedown', resumeContext, { passive: true });
-
-// --- 3. THE NOISE HEARTBEAT ---
-function startHeartbeat() {
-    if (!audioCtx) return;
-    stopHeartbeat(); 
-    
-    // Create actual noise, but make it virtually silent (0.001)
-    // Android Chrome will not suspend an active noise buffer.
-    const bufferSize = audioCtx.sampleRate * 2; 
-    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1; 
+// --- MAIN AUDIO ENGINE INIT ---
+function initAudioEngine() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // POINTS 1 & 8: THE AUDIO/VIDEO ANCHOR HACK
+        // We create a media stream destination and pipe it to an HTML5 Audio tag.
+        // This forces Android to treat this tab as a high-priority media player.
+        mediaStreamDest = audioCtx.createMediaStreamDestination();
+        anchorAudioElement = new Audio();
+        anchorAudioElement.srcObject = mediaStreamDest.stream;
+        anchorAudioElement.loop = true;
+        anchorAudioElement.playsInline = true;
+        
+        // POINT 10: ONSTATECHANGE (Handling phone calls)
+        audioCtx.onstatechange = () => {
+            console.log("Audio Engine State:", audioCtx.state);
+            if (audioCtx.state === 'interrupted' || audioCtx.state === 'suspended') {
+                if (isTimerRunning) {
+                    // Continuously try to resume if a call interrupted us
+                    let retry = setInterval(() => {
+                        if (audioCtx.state === 'running') clearInterval(retry);
+                        else audioCtx.resume();
+                    }, 2000);
+                }
+            }
+        };
     }
-
-    heartbeat = audioCtx.createBufferSource();
-    heartbeat.buffer = noiseBuffer;
-    heartbeat.loop = true;
     
-    const hbGain = audioCtx.createGain();
-    hbGain.gain.value = 0.001; 
-
-    heartbeat.connect(hbGain);
-    hbGain.connect(audioCtx.destination);
-    heartbeat.start();
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    
+    // Must be called on user interaction
+    if(anchorAudioElement && anchorAudioElement.paused) {
+        anchorAudioElement.play().catch(e => console.log("Anchor play pending interaction"));
+    }
+    
+    setupMediaSession();
 }
 
-function stopHeartbeat() {
-    if (heartbeat) { 
-        try { heartbeat.stop(); heartbeat.disconnect(); } catch(e) {}
-        heartbeat = null; 
+// --- POINT 5: RE-RESUMING ON VISIBILITY ---
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        if (isTimerRunning && wakeLock === null) await requestWakeLock();
+        updateTimerDisplay(); 
     }
-}
+});
+
+window.addEventListener('touchstart', initAudioEngine, { passive: true });
+window.addEventListener('mousedown', initAudioEngine, { passive: true });
 
 function stopAllAudio() {
     currentAudioNodes.forEach(node => {
@@ -97,89 +149,56 @@ function stopAllAudio() {
         try { node.disconnect(); } catch (e) {}
     });
     currentAudioNodes = [];
-    activeFrequency = null;
     document.querySelectorAll('.freq-btn').forEach(btn => btn.classList.remove('active-glow'));
 }
 
-// --- 4. NEURAL AUDIO GENERATION (ANDROID OPTIMIZED) ---
+// --- NEURAL AUDIO GENERATION ---
 function playIsochronicTone(baseFreq, pulseHz) {
-    resumeContext(); 
+    initAudioEngine(); 
     stopAllAudio();
-    startHeartbeat(); 
 
-    // Oscillator 1: The Carrier (What you hear)
     const oscillator = audioCtx.createOscillator();
-    oscillator.type = 'triangle'; // Triangle wave is louder on Android speakers
+    oscillator.type = 'triangle'; 
     oscillator.frequency.value = baseFreq;
 
-    // Oscillator 2: The Modulator (The beat)
     const lfo = audioCtx.createOscillator();
     lfo.type = 'sine';
     lfo.frequency.value = pulseHz; 
 
-    // Master Volume
     const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.5; 
+    // POINT 4: LOW-LEVEL GAIN TRICK (setValueAtTime instead of direct assignment)
+    gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.5, audioCtx.currentTime + 0.1); 
 
-    // Pulse Depth
     const lfoGain = audioCtx.createGain();
-    lfoGain.gain.value = 0.5; 
+    lfoGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
     
-    // Connect them up
+    // Routing
     lfo.connect(lfoGain);
     lfoGain.connect(gainNode.gain); 
     oscillator.connect(gainNode);
+    
+    // Connect to BOTH the normal speakers and the Anchor stream
     gainNode.connect(audioCtx.destination);
+    gainNode.connect(mediaStreamDest);
 
-    // Ignite
+    // POINT 7: ONENDED RECOVERY
+    oscillator.onended = () => {
+        if (isTimerRunning) console.warn("Oscillator killed unexpectedly!");
+    };
+
     oscillator.start();
     lfo.start();
 
     currentAudioNodes.push(oscillator, lfo, gainNode, lfoGain);
-}
-
-function playNoise(type) {
-    resumeContext();
-    stopAllAudio();
-    startHeartbeat(); 
-
-    const bufferSize = 2 * audioCtx.sampleRate;
-    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-
-    let lastOut = 0;
-    for (let i = 0; i < bufferSize; i++) {
-        let white = Math.random() * 2 - 1;
-        if (type === 'brown') {
-            output[i] = (lastOut + (0.02 * white)) / 1.02;
-            lastOut = output[i];
-            output[i] *= 2.0; 
-        } else {
-            output[i] = (lastOut * 0.9) + (white * 0.1);
-            lastOut = output[i];
-            output[i] *= 2.5; 
-        }
-    }
-
-    const noiseNode = audioCtx.createBufferSource();
-    noiseNode.buffer = noiseBuffer;
-    noiseNode.loop = true;
-    
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.6; 
-
-    noiseNode.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    noiseNode.start();
-
-    currentAudioNodes.push(noiseNode, gainNode);
+    setupMediaSession(); // Update title
 }
 
 function activateState(stateId, buttonElement) {
-    resumeContext(); 
+    initAudioEngine(); 
     if (activeFrequency === stateId) {
         stopAllAudio();
-        stopHeartbeat();
+        activeFrequency = null;
         return;
     }
 
@@ -187,8 +206,8 @@ function activateState(stateId, buttonElement) {
         case 'gamma': playIsochronicTone(639, 40); break; 
         case 'alpha': playIsochronicTone(528, 10); break; 
         case 'theta': playIsochronicTone(432, 6); break;  
-        case 'brown': playNoise('brown'); break;
-        case 'pink': playNoise('pink'); break;
+        // Note: Noise generators removed for this test to isolate the Sine wave success. 
+        // If this works, we add noise back.
     }
 
     activeFrequency = stateId;
@@ -196,8 +215,7 @@ function activateState(stateId, buttonElement) {
     buttonElement.classList.add('active-glow');
 }
 
-// --- 5. DELTA-TIME TEMPORAL ENGINE ---
-// This guarantees the timer doesn't drift if Chrome throttles the tab
+// --- TEMPORAL ENGINE ---
 function updateTimerDisplay() {
     let minutes = Math.floor(timeRemaining / 60);
     let seconds = timeRemaining % 60;
@@ -205,9 +223,13 @@ function updateTimerDisplay() {
 }
 
 function toggleTimer() {
-    resumeContext();
+    initAudioEngine();
+    
+    // Force the Anchor to play exactly when user hits ignite
+    if (anchorAudioElement) anchorAudioElement.play().catch(e => console.log(e));
+
     if (isTimerRunning) {
-        clearInterval(timerInterval);
+        timerWorker.postMessage({ command: 'stop' });
         isTimerRunning = false;
         toggleTimerBtn.innerHTML = "<span>⚡</span> IGNITE SESSION";
         heartbeatOverlay.classList.remove('pulse-active');
@@ -215,36 +237,21 @@ function toggleTimer() {
     } else {
         isTimerRunning = true;
         requestWakeLock(); 
+        timerWorker.postMessage({ command: 'start', duration: timeRemaining });
         toggleTimerBtn.innerHTML = "<span>⏸</span> PAUSE MATRIX";
         heartbeatOverlay.classList.add('pulse-active');
-        
-        // Calculate the absolute End Time in the future
-        endTime = Date.now() + (timeRemaining * 1000);
-        
-        timerInterval = setInterval(() => {
-            // Check current time against absolute end time
-            const now = Date.now();
-            timeRemaining = Math.max(0, Math.round((endTime - now) / 1000));
-            
-            updateTimerDisplay();
-            
-            if (timeRemaining <= 0) {
-                completeSession();
-            }
-        }, 1000);
     }
 }
 
 function completeSession() {
-    clearInterval(timerInterval);
     isTimerRunning = false;
     stopAllAudio();
-    stopHeartbeat();
     if (wakeLock) { wakeLock.release(); wakeLock = null; }
     
     toggleTimerBtn.innerHTML = "<span>↺</span> RESET";
     heartbeatOverlay.classList.remove('pulse-active');
     
+    // Chime
     const chime = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     chime.type = 'sine';
@@ -257,7 +264,6 @@ function completeSession() {
     chime.stop(audioCtx.currentTime + 1.5);
 }
 
-// Allow slider manipulation only when paused
 if(timeSlider) {
     timeSlider.addEventListener('input', (e) => {
         if (!isTimerRunning) {
@@ -265,4 +271,4 @@ if(timeSlider) {
             updateTimerDisplay(); 
         }
     });
-}
+                }
