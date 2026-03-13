@@ -1,6 +1,6 @@
 /**
- * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR (TITANIUM ANDROID BUILD)
- * Integrating 10-Point Hardware Persistence Architecture
+ * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR (TITANIUM ANDROID V2)
+ * Integrating: User Gesture Sync Fix, Hot-Pipe Stream, and 10-Point Persistence
  */
 
 let audioCtx = null;
@@ -13,6 +13,7 @@ let timeRemaining = 300;
 // The Anchor Elements
 let anchorAudioElement = null;
 let mediaStreamDest = null;
+let hotOscillator = null; // The permanent cold-pipe fix
 
 // DOM Elements
 const timerDisplay = document.getElementById('timer-display');
@@ -20,7 +21,7 @@ const timeSlider = document.getElementById('time-slider');
 const toggleTimerBtn = document.getElementById('toggle-timer-btn');
 const heartbeatOverlay = document.getElementById('heartbeat-overlay');
 
-// --- POINT 6: DATA URI WEB WORKER (No external files needed, bypasses CSP) ---
+// --- DATA URI WEB WORKER (Timer logic isolated from main thread) ---
 const workerCode = `
     let timerId = null;
     self.onmessage = function(e) {
@@ -49,7 +50,7 @@ timerWorker.onmessage = function(e) {
     if (e.data.status === 'done') completeSession();
 };
 
-// --- POINT 9: BATTERY STATUS CHECK ---
+// --- BATTERY STATUS CHECK ---
 if ('getBattery' in navigator) {
     navigator.getBattery().then(battery => {
         console.log(`System Power: ${Math.round(battery.level * 100)}%`);
@@ -67,12 +68,12 @@ async function requestWakeLock() {
         try {
             wakeLock = await navigator.wakeLock.request('screen');
         } catch (err) {
-            console.warn("Wake Lock Denied (Likely Power Saving Mode):", err.message);
+            console.warn("Wake Lock Denied:", err.message);
         }
     }
 }
 
-// --- POINTS 2 & 3: MEDIA SESSION API ---
+// --- MEDIA SESSION API ---
 function setupMediaSession() {
     if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
@@ -95,21 +96,31 @@ function initAudioEngine() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
-        // POINTS 1 & 8: THE AUDIO/VIDEO ANCHOR HACK
-        // We create a media stream destination and pipe it to an HTML5 Audio tag.
-        // This forces Android to treat this tab as a high-priority media player.
+        // THE AUDIO/VIDEO ANCHOR HACK
         mediaStreamDest = audioCtx.createMediaStreamDestination();
         anchorAudioElement = new Audio();
         anchorAudioElement.srcObject = mediaStreamDest.stream;
         anchorAudioElement.loop = true;
         anchorAudioElement.playsInline = true;
+
+        // FIX 2: THE HOT PIPE GENERATOR
+        // This permanent oscillator ensures the stream is NEVER empty.
+        hotOscillator = audioCtx.createOscillator();
+        const hotGain = audioCtx.createGain();
+        hotOscillator.type = 'sine';
+        hotOscillator.frequency.value = 440; // Standard pitch
+        hotGain.gain.setValueAtTime(0.0001, audioCtx.currentTime); // Imperceptible volume
         
-        // POINT 10: ONSTATECHANGE (Handling phone calls)
+        hotOscillator.connect(hotGain);
+        hotGain.connect(mediaStreamDest);       // Keep the anchor stream hot
+        hotGain.connect(audioCtx.destination);  // Keep main output hot
+        hotOscillator.start();
+        
+        // ONSTATECHANGE (Handling phone calls)
         audioCtx.onstatechange = () => {
             console.log("Audio Engine State:", audioCtx.state);
             if (audioCtx.state === 'interrupted' || audioCtx.state === 'suspended') {
                 if (isTimerRunning) {
-                    // Continuously try to resume if a call interrupted us
                     let retry = setInterval(() => {
                         if (audioCtx.state === 'running') clearInterval(retry);
                         else audioCtx.resume();
@@ -117,21 +128,34 @@ function initAudioEngine() {
                 }
             }
         };
+        setupMediaSession();
     }
     
     if (audioCtx.state === 'suspended') {
         audioCtx.resume();
     }
-    
-    // Must be called on user interaction
-    if(anchorAudioElement && anchorAudioElement.paused) {
-        anchorAudioElement.play().catch(e => console.log("Anchor play pending interaction"));
-    }
-    
-    setupMediaSession();
 }
 
-// --- POINT 5: RE-RESUMING ON VISIBILITY ---
+// --- FIX 1: SYNCHRONOUS GESTURE UNLOCK ---
+// This guarantees the .play() command happens immediately on the first tap
+function unlockAudioContext() {
+    initAudioEngine();
+    if (anchorAudioElement && anchorAudioElement.paused) {
+        anchorAudioElement.play().catch(e => console.warn("Anchor play blocked:", e));
+    }
+    // Remove listeners once unlocked to prevent memory leaks
+    window.removeEventListener('touchstart', unlockAudioContext);
+    window.removeEventListener('mousedown', unlockAudioContext);
+    document.removeEventListener('click', unlockAudioContext);
+}
+
+// Attach the aggressive unlockers
+window.addEventListener('touchstart', unlockAudioContext, { once: true });
+window.addEventListener('mousedown', unlockAudioContext, { once: true });
+document.addEventListener('click', unlockAudioContext, { once: true });
+
+
+// --- RE-RESUMING ON VISIBILITY ---
 document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible') {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -139,9 +163,6 @@ document.addEventListener('visibilitychange', async () => {
         updateTimerDisplay(); 
     }
 });
-
-window.addEventListener('touchstart', initAudioEngine, { passive: true });
-window.addEventListener('mousedown', initAudioEngine, { passive: true });
 
 function stopAllAudio() {
     currentAudioNodes.forEach(node => {
@@ -166,7 +187,7 @@ function playIsochronicTone(baseFreq, pulseHz) {
     lfo.frequency.value = pulseHz; 
 
     const gainNode = audioCtx.createGain();
-    // POINT 4: LOW-LEVEL GAIN TRICK (setValueAtTime instead of direct assignment)
+    // LOW-LEVEL GAIN TRICK 
     gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.5, audioCtx.currentTime + 0.1); 
 
@@ -182,7 +203,6 @@ function playIsochronicTone(baseFreq, pulseHz) {
     gainNode.connect(audioCtx.destination);
     gainNode.connect(mediaStreamDest);
 
-    // POINT 7: ONENDED RECOVERY
     oscillator.onended = () => {
         if (isTimerRunning) console.warn("Oscillator killed unexpectedly!");
     };
@@ -191,11 +211,13 @@ function playIsochronicTone(baseFreq, pulseHz) {
     lfo.start();
 
     currentAudioNodes.push(oscillator, lfo, gainNode, lfoGain);
-    setupMediaSession(); // Update title
+    setupMediaSession(); 
 }
 
 function activateState(stateId, buttonElement) {
-    initAudioEngine(); 
+    // Ensure gesture is caught immediately here as a fallback
+    unlockAudioContext(); 
+    
     if (activeFrequency === stateId) {
         stopAllAudio();
         activeFrequency = null;
@@ -206,8 +228,6 @@ function activateState(stateId, buttonElement) {
         case 'gamma': playIsochronicTone(639, 40); break; 
         case 'alpha': playIsochronicTone(528, 10); break; 
         case 'theta': playIsochronicTone(432, 6); break;  
-        // Note: Noise generators removed for this test to isolate the Sine wave success. 
-        // If this works, we add noise back.
     }
 
     activeFrequency = stateId;
@@ -223,10 +243,8 @@ function updateTimerDisplay() {
 }
 
 function toggleTimer() {
-    initAudioEngine();
-    
-    // Force the Anchor to play exactly when user hits ignite
-    if (anchorAudioElement) anchorAudioElement.play().catch(e => console.log(e));
+    // FIX 1 CONTINUED: Ensure absolute synchronous playback on Ignite
+    unlockAudioContext();
 
     if (isTimerRunning) {
         timerWorker.postMessage({ command: 'stop' });
@@ -271,4 +289,4 @@ if(timeSlider) {
             updateTimerDisplay(); 
         }
     });
-                }
+    }
