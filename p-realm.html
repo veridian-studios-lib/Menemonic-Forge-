@@ -7,13 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* THE OBSIDIAN SPECTRUM */
+        /* THE OBSIDIAN SPECTRUM - TITANIUM V3.1 */
         :root { 
-            --void: #030303; 
+            --void: #050507; 
             --cyan: #00F2FF; 
-            --cyan-glow: rgba(0, 242, 255, 0.4);
-            --glass: rgba(20, 20, 25, 0.6);
-            --glass-border: rgba(0, 242, 255, 0.15);
+            --cyan-glow: rgba(0, 242, 255, 0.5);
+            --glass: rgba(12, 14, 18, 0.75);
+            --glass-border: rgba(0, 242, 255, 0.12);
         }
         
         body { 
@@ -29,6 +29,10 @@
         .lux-serif { font-family: 'Cinzel', serif; letter-spacing: 0.15em; }
         .mono-text { font-family: 'JetBrains Mono', monospace; }
 
+        /* Hide Scrollbar but Keep Functionality */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
         .forge-bg {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: radial-gradient(circle at 50% 30%, #111a1f 0%, var(--void) 80%);
@@ -37,7 +41,7 @@
 
         /* --- THE MASTER HANDSHAKE (Unlock Screen) --- */
         #unlock-screen {
-            position: fixed; inset: 0; z-index: 500; background: var(--void);
+            position: fixed; inset: 0; z-index: 500; background: #020202;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
@@ -57,67 +61,83 @@
 
         @keyframes heartbeatPulse {
             0% { box-shadow: inset 0 0 0px rgba(0, 242, 255, 0); }
-            50% { box-shadow: inset 0 0 120px rgba(0, 242, 255, 0.12); }
+            50% { box-shadow: inset 0 0 140px rgba(0, 242, 255, 0.15); }
             100% { box-shadow: inset 0 0 0px rgba(0, 242, 255, 0); }
         }
 
         .glass-panel {
-            background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            background: var(--glass); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
             border: 1px solid var(--glass-border); border-radius: 24px; padding: 35px 25px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.8), inset 0 1px 10px rgba(0, 242, 255, 0.05);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.9), inset 0 1px 15px rgba(0, 242, 255, 0.08);
             width: 100%; max-width: 480px; margin: 0 auto;
         }
 
         #timer-display {
-            font-size: 5.5rem; line-height: 1; font-weight: 700;
-            text-shadow: 0 0 25px var(--cyan-glow); color: var(--cyan);
+            font-size: clamp(4rem, 15vw, 5.5rem); line-height: 1; font-weight: 700;
+            color: #E0FFFF; /* White core */
+            text-shadow: 0 0 15px rgba(0, 242, 255, 0.6), 0 0 30px rgba(0, 242, 255, 0.3), 0 0 60px rgba(0, 242, 255, 0.1);
             text-align: center; margin-bottom: 25px; letter-spacing: -3px;
         }
 
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; margin: 15px 0; }
+        input[type=range]:focus { outline: none; }
         input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%;
+            -webkit-appearance: none; height: 22px; width: 22px; border-radius: 50%;
             background: var(--void); border: 2px solid var(--cyan); cursor: pointer; margin-top: -10px;
-            box-shadow: 0 0 15px var(--cyan); transition: transform 0.2s;
+            box-shadow: 0 0 12px var(--cyan), inset 0 0 4px var(--cyan); transition: transform 0.2s;
         }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); box-shadow: 0 0 20px var(--cyan); }
         input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 2px;
+            width: 100%; height: 3px; cursor: pointer; background: rgba(255,255,255,0.15); border-radius: 2px;
         }
 
         .freq-btn {
-            background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(10, 10, 15, 0.5); border: 1px solid rgba(0, 242, 255, 0.05);
             border-radius: 12px; padding: 16px 8px; text-align: center; cursor: pointer;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex; flex-direction: column; align-items: center; gap: 8px;
         }
+        .freq-btn:hover {
+            border-color: rgba(0, 242, 255, 0.3); background: rgba(0, 242, 255, 0.03);
+            transform: translateY(-2px);
+        }
         .freq-btn.active-glow {
             background: rgba(0, 242, 255, 0.08); border-color: var(--cyan); color: var(--cyan);
             box-shadow: 0 10px 25px rgba(0, 242, 255, 0.15), inset 0 0 15px rgba(0, 242, 255, 0.1);
-            transform: translateY(-3px);
+            transform: translateY(-4px);
         }
 
-        .freq-icon { font-size: 1.6rem; opacity: 0.9; }
+        .freq-icon { font-size: 1.6rem; opacity: 0.9; transition: transform 0.3s ease; }
+        .freq-btn:hover .freq-icon { transform: scale(1.15); }
         .freq-name { font-size: 0.7rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
         .freq-hz { font-size: 0.6rem; opacity: 0.4; font-family: 'JetBrains Mono', monospace; }
 
         #toggle-timer-btn {
-            width: 100%; background: transparent; border: 1px solid var(--cyan); color: var(--cyan);
-            padding: 22px; border-radius: 12px; font-size: 1.1rem; font-weight: 700; 
+            width: 100%; background: rgba(0, 242, 255, 0.02); border: 1px solid rgba(0, 242, 255, 0.4); 
+            color: var(--cyan); padding: 22px; border-radius: 12px; font-size: 1.1rem; font-weight: 700; 
             letter-spacing: 5px; text-transform: uppercase; cursor: pointer; 
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex; justify-content: center; align-items: center; gap: 12px;
-            margin-top: 35px; text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+            display: flex; justify-content: center; align-items: center;
+            margin-top: 35px; text-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
+            box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.05), 0 5px 15px rgba(0,0,0,0.4);
         }
-        #toggle-timer-btn:active { background: var(--cyan); color: var(--void); }
+        #toggle-timer-btn span { margin-right: 12px; font-size: 1.3rem; }
+        #toggle-timer-btn:hover { 
+            background: rgba(0, 242, 255, 0.08); border-color: var(--cyan); 
+            box-shadow: inset 0 0 25px rgba(0, 242, 255, 0.15), 0 5px 25px rgba(0, 242, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        #toggle-timer-btn:active { background: var(--cyan); color: var(--void); transform: translateY(1px); }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center p-4">
 
-    <audio id="hidden-anchor" playsinline muted style="display:none;"></audio>  
+    <audio id="hidden-anchor" playsinline muted style="display:none;"></audio>
 
     <div id="unlock-screen" onclick="enterRealm()">
-        <p class="mono-text text-[#00F2FF] opacity-50 mb-6 text-xs uppercase tracking-[0.3em]">Initialize Interface</p>
-        <button class="px-10 py-4 border border-[#00F2FF]/40 text-[#00F2FF] uppercase tracking-[0.4em] text-sm hover:bg-[#00F2FF] hover:text-black transition-all duration-500 rounded-sm">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,242,255,0.03)_0%,transparent_50%)] pointer-events-none"></div>
+        <p class="mono-text text-[#00F2FF] opacity-50 mb-6 text-xs uppercase tracking-[0.3em] relative z-10">Initialize Interface</p>
+        <button class="px-10 py-4 border border-[#00F2FF]/40 text-[#00F2FF] uppercase tracking-[0.4em] text-sm hover:border-[#00F2FF] hover:bg-[#00F2FF]/5 hover:shadow-[0_0_30px_rgba(0,242,255,0.3)] transition-all duration-500 rounded-sm relative z-10">
             Enter P-Realm
         </button>
     </div>
@@ -125,32 +145,33 @@
     <div class="forge-bg"></div>
     <div id="heartbeat-overlay"></div> 
 
-    <header class="w-full max-w-[480px] flex justify-between items-center mb-6 relative z-10 px-2">
-        <button onclick="window.location.href='index.html'" class="mono-text text-[10px] uppercase opacity-40 hover:opacity-100 hover:text-[#00F2FF] transition-all cursor-pointer tracking-widest">
-            ← Sanctum
+    <header class="w-full max-w-[480px] flex justify-between items-center mb-8 relative z-10 px-2">
+        <button onclick="window.location.href='index.html'" class="mono-text text-[10px] uppercase opacity-40 hover:opacity-100 hover:text-[#00F2FF] transition-all cursor-pointer tracking-widest flex items-center gap-2">
+            <span class="text-lg mb-0.5 opacity-80">‹</span> SANCTUM
         </button>
-        <div class="mono-text text-[9px] text-[#00F2FF] opacity-60 uppercase tracking-widest border border-[#00F2FF]/20 px-3 py-1 rounded-full">
-            System Online
+        <div class="mono-text text-[9px] text-[#00F2FF] opacity-80 uppercase tracking-widest border border-[#00F2FF]/30 px-3 py-1.5 rounded-full flex items-center gap-2 bg-[#00F2FF]/5">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#00F2FF] shadow-[0_0_6px_#00F2FF] animate-pulse"></span>
+            SYSTEM ONLINE
         </div>
     </header>
 
-    <main class="glass-panel relative z-10 flex-grow max-h-[85vh] overflow-y-auto">
+    <main class="glass-panel relative z-10 flex-grow max-h-[85vh] overflow-y-auto no-scrollbar">
         <div class="text-center mb-6">
-            <h1 class="lux-serif text-2xl" style="text-shadow: 0 0 15px rgba(0, 242, 255, 0.2);">ACCELERATOR</h1>
+            <h1 class="lux-serif text-2xl" style="text-shadow: 0 0 15px rgba(0, 242, 255, 0.3);">ACCELERATOR</h1>
         </div>
 
         <div id="timer-display" class="mono-text">05:00</div>
         
-        <div class="mb-10">
-            <div class="flex justify-between text-[11px] mono-text opacity-60 mb-2 uppercase tracking-widest">
-                <span>Phase Duration</span>
-                <span id="slider-val" class="text-[#00F2FF]">5 Min</span>
+        <div class="mb-10 w-full">
+            <div class="flex justify-between text-[11px] mono-text opacity-70 mb-3 uppercase tracking-widest">
+                <span>PHASE DURATION</span>
+                <span id="slider-val" class="text-[#00F2FF] font-bold drop-shadow-[0_0_8px_rgba(0,242,255,0.6)]">5 MIN</span>
             </div>
-            <input type="range" id="time-slider" min="1" max="120" value="5" oninput="document.getElementById('slider-val').innerText = this.value + ' Min'">
+            <input type="range" id="time-slider" min="1" max="120" value="5" oninput="document.getElementById('slider-val').innerText = this.value + ' MIN'">
         </div>
 
-        <div class="w-full h-px bg-white/10 mb-8"></div>
-        <div class="mb-5 text-[10px] mono-text opacity-50 text-center uppercase tracking-[0.2em]">Neural Injection Matrix</div>
+        <div class="w-full h-px bg-white/5 mb-8"></div>
+        <div class="mb-5 text-[10px] mono-text opacity-50 text-center uppercase tracking-[0.2em]">NEURAL INJECTION MATRIX</div>
         
         <div class="grid grid-cols-3 gap-3 mb-3">
             <div class="freq-btn" onclick="activateState('theta', this)">
@@ -194,8 +215,6 @@
         function enterRealm() {
             console.log("Omni-Director: Handshake Initiated.");
             
-            // Connect to the new Titanium V2 function.
-            // This grabs the audio hardware token synchronously.
             if(typeof unlockAudioContext === 'function') {
                 unlockAudioContext();
                 console.log("Hardware Lock: Disengaged. Pipe is Hot.");
