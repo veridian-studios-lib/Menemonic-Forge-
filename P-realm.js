@@ -1,6 +1,7 @@
 /**
- * P-REALM ACCELERATOR - TITANIUM V3.1 LOGIC CORE
+ * P-REALM ACCELERATOR - TITANIUM V3.2 LOGIC CORE (MAXIMUM POWER)
  * Handles Real-time Web Audio API Synthesis, State Management, and Chrono-Tracking.
+ * OS-Level Throttling Bypassed | Main Thread Optimized | Race Conditions Eliminated
  */
 
 const AppState = {
@@ -24,6 +25,15 @@ const AppState = {
         noiseGain: null
     },
 
+    // Pre-computed Noise Buffers (Prevents Main Thread Stutter)
+    noiseBuffers: {
+        brown: null,
+        pink: null
+    },
+
+    // Timeout Tracker (Prevents Race Conditions)
+    transitionTimers: [],
+
     // The Carrier Frequency for Binaural Beats (Deep, resonant tone)
     carrierFreq: 210.42 // Solfeggio-adjacent tuning
 };
@@ -35,7 +45,7 @@ const FREQUENCIES = {
 };
 
 // ==========================================
-// 1. THE MASTER HANDSHAKE (Hardware Unlock)
+// 1. THE MASTER HANDSHAKE (Hardware Unlock & Buffer Prep)
 // ==========================================
 function unlockAudioContext() {
     if (!AppState.audioCtx) {
@@ -49,20 +59,57 @@ function unlockAudioContext() {
         AppState.audioCtx.resume();
     }
 
-    // Ping the hidden anchor to bypass strict iOS/Android auto-play policies
     const anchor = document.getElementById('hidden-anchor');
-    if (anchor) {
-        anchor.play().catch(e => console.warn("Anchor silent failure (expected):", e));
-    }
 
     // Establish the Master Output
     if (!AppState.masterGain) {
         AppState.masterGain = AppState.audioCtx.createGain();
-        AppState.masterGain.gain.value = 0; // Start at 0 to prevent hardware pop
-        AppState.masterGain.connect(AppState.audioCtx.destination);
+        // FIX 1: Anchor the ramp starting point
+        AppState.masterGain.gain.setValueAtTime(0, AppState.audioCtx.currentTime); 
+        
+        // FIX 2: The Missing Link (MediaStreamDestination for OS Keep-Alive)
+        if (anchor) {
+            const streamDest = AppState.audioCtx.createMediaStreamDestination();
+            anchor.srcObject = streamDest.stream;
+            AppState.masterGain.connect(streamDest); // Pipe to dummy audio element
+            
+            // Note: We MUST also connect to the actual hardware destination to hear it, 
+            // since the HTML anchor is muted to prevent echoing/feedback.
+            AppState.masterGain.connect(AppState.audioCtx.destination); 
+            
+            anchor.play().catch(e => console.warn("Anchor silent failure (expected):", e));
+        } else {
+            AppState.masterGain.connect(AppState.audioCtx.destination);
+        }
+
+        // FIX 3: Pre-compute Noise Buffers on Startup
+        generateNoiseBuffers();
     }
     
-    console.log("System: Audio Context Unlocked & Routed.");
+    console.log("System: Audio Context Unlocked, Routed, and Buffered.");
+}
+
+function generateNoiseBuffers() {
+    const ctx = AppState.audioCtx;
+    const bufferSize = 2 * ctx.sampleRate; // 2 seconds of buffer
+
+    ['brown', 'pink'].forEach(type => {
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let lastOut = 0;
+        
+        for (let i = 0; i < bufferSize; i++) {
+            let white = Math.random() * 2 - 1;
+            if (type === 'brown') {
+                output[i] = (lastOut + (0.02 * white)) / 1.02; 
+                lastOut = output[i];
+                output[i] *= 3.5; // Gain compensation
+            } else { // Pink
+                output[i] = white * 0.3; 
+            }
+        }
+        AppState.noiseBuffers[type] = noiseBuffer;
+    });
 }
 
 // ==========================================
@@ -73,7 +120,6 @@ function activateState(type, element) {
     const isNoise = ['brown', 'pink'].includes(type);
 
     if (isBeat) {
-        // Toggle off other beats
         document.querySelectorAll('.freq-btn').forEach(btn => {
             const name = btn.querySelector('.freq-name').innerText.toLowerCase();
             if (['theta', 'alpha', 'gamma'].includes(name) && btn !== element) {
@@ -81,7 +127,6 @@ function activateState(type, element) {
             }
         });
 
-        // Toggle current beat
         if (AppState.activeBeat === type) {
             AppState.activeBeat = null;
             element.classList.remove('active-glow');
@@ -90,7 +135,6 @@ function activateState(type, element) {
             element.classList.add('active-glow');
         }
     } else if (isNoise) {
-        // Toggle off other noises
         document.querySelectorAll('.freq-btn').forEach(btn => {
             const hzText = btn.querySelector('.freq-hz').innerText.toLowerCase();
             if (hzText.includes('noise') && btn !== element) {
@@ -98,7 +142,6 @@ function activateState(type, element) {
             }
         });
 
-        // Toggle current noise
         if (AppState.activeNoise === type) {
             AppState.activeNoise = null;
             element.classList.remove('active-glow');
@@ -108,7 +151,6 @@ function activateState(type, element) {
         }
     }
 
-    // If session is live, dynamically rebuild the audio nodes
     if (AppState.isRunning) {
         rebuildAudioStream();
     }
@@ -121,48 +163,53 @@ function rebuildAudioStream() {
     const ctx = AppState.audioCtx;
     const now = ctx.currentTime;
 
+    // FIX 4: Clear pending teardown timers to prevent Race Conditions
+    AppState.transitionTimers.forEach(clearTimeout);
+    AppState.transitionTimers = [];
+
     // 1. Cleanup existing nodes smoothly
     if (AppState.nodes.beatGain) {
+        // Anchor the current gain value before ramping down
+        AppState.nodes.beatGain.gain.setValueAtTime(AppState.nodes.beatGain.gain.value, now);
         AppState.nodes.beatGain.gain.linearRampToValueAtTime(0, now + 0.5);
-        setTimeout(killBeatNodes, 500);
+        AppState.transitionTimers.push(setTimeout(killBeatNodes, 500));
     }
     if (AppState.nodes.noiseGain) {
+        AppState.nodes.noiseGain.gain.setValueAtTime(AppState.nodes.noiseGain.gain.value, now);
         AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0, now + 0.5);
-        setTimeout(killNoiseNodes, 500);
+        AppState.transitionTimers.push(setTimeout(killNoiseNodes, 500));
     }
 
     // 2. Re-instantiate based on selections
-    setTimeout(() => {
+    AppState.transitionTimers.push(setTimeout(() => {
         if (AppState.isRunning) {
             if (AppState.activeBeat) synthesizeBinaural(AppState.activeBeat);
             if (AppState.activeNoise) synthesizeNoise(AppState.activeNoise);
         }
-    }, 550);
+    }, 550));
 }
 
 function synthesizeBinaural(type) {
     const ctx = AppState.audioCtx;
     const diff = FREQUENCIES[type];
+    const now = ctx.currentTime;
     
-    // Create Nodes
     AppState.nodes.leftOsc = ctx.createOscillator();
     AppState.nodes.rightOsc = ctx.createOscillator();
     AppState.nodes.beatGain = ctx.createGain();
-    const merger = ctx.createChannelMerger(2); // Hard pan left/right
+    const merger = ctx.createChannelMerger(2); 
 
-    // Frequencies: Carrier ± (Diff / 2)
     AppState.nodes.leftOsc.frequency.value = AppState.carrierFreq - (diff / 2);
     AppState.nodes.rightOsc.frequency.value = AppState.carrierFreq + (diff / 2);
 
-    // Routing
-    AppState.nodes.leftOsc.connect(merger, 0, 0); // Left ear
-    AppState.nodes.rightOsc.connect(merger, 0, 1); // Right ear
+    AppState.nodes.leftOsc.connect(merger, 0, 0); 
+    AppState.nodes.rightOsc.connect(merger, 0, 1); 
     merger.connect(AppState.nodes.beatGain);
     AppState.nodes.beatGain.connect(AppState.masterGain);
 
-    // Smooth Fade In
-    AppState.nodes.beatGain.gain.setValueAtTime(0, ctx.currentTime);
-    AppState.nodes.beatGain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 2); // 60% volume max
+    // Fade In Anchor
+    AppState.nodes.beatGain.gain.setValueAtTime(0, now);
+    AppState.nodes.beatGain.gain.linearRampToValueAtTime(0.6, now + 2); 
 
     AppState.nodes.leftOsc.start();
     AppState.nodes.rightOsc.start();
@@ -170,59 +217,61 @@ function synthesizeBinaural(type) {
 
 function synthesizeNoise(type) {
     const ctx = AppState.audioCtx;
-    const bufferSize = 2 * ctx.sampleRate; // 2 seconds of buffer
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-
-    // Procedural Noise Generation Algorithms
-    let lastOut = 0;
-    for (let i = 0; i < bufferSize; i++) {
-        let white = Math.random() * 2 - 1;
-        if (type === 'brown') {
-            output[i] = (lastOut + (0.02 * white)) / 1.02; // Deep, rumbling
-            lastOut = output[i];
-            output[i] *= 3.5; // Gain compensation for Brown noise
-        } else { // Pink
-            output[i] = white * 0.3; // Simplified Pink for performance
-        }
-    }
+    const now = ctx.currentTime;
 
     AppState.nodes.noiseSrc = ctx.createBufferSource();
-    AppState.nodes.noiseSrc.buffer = noiseBuffer;
+    // Use the Pre-computed Buffer (No Main Thread Stutter)
+    AppState.nodes.noiseSrc.buffer = AppState.noiseBuffers[type]; 
     AppState.nodes.noiseSrc.loop = true;
 
     AppState.nodes.noiseFilter = ctx.createBiquadFilter();
     AppState.nodes.noiseFilter.type = 'lowpass';
-    AppState.nodes.noiseFilter.frequency.value = type === 'brown' ? 400 : 1200; // Muffle it
+    AppState.nodes.noiseFilter.frequency.value = type === 'brown' ? 400 : 1200; 
 
     AppState.nodes.noiseGain = ctx.createGain();
     
-    // Routing
     AppState.nodes.noiseSrc.connect(AppState.nodes.noiseFilter);
     AppState.nodes.noiseFilter.connect(AppState.nodes.noiseGain);
     AppState.nodes.noiseGain.connect(AppState.masterGain);
 
-    // Smooth Fade In
-    AppState.nodes.noiseGain.gain.setValueAtTime(0, ctx.currentTime);
-    AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 3); // 40% volume max
+    // Fade In Anchor
+    AppState.nodes.noiseGain.gain.setValueAtTime(0, now);
+    AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0.4, now + 3); 
 
     AppState.nodes.noiseSrc.start();
 }
 
 function killBeatNodes() {
+    // Try-Catch block bulletproofs against rapid toggle race conditions
     if (AppState.nodes.leftOsc) {
-        AppState.nodes.leftOsc.stop(); AppState.nodes.leftOsc.disconnect();
-        AppState.nodes.rightOsc.stop(); AppState.nodes.rightOsc.disconnect();
+        try { AppState.nodes.leftOsc.stop(); } catch(e){}
+        AppState.nodes.leftOsc.disconnect();
+        AppState.nodes.leftOsc = null;
+    }
+    if (AppState.nodes.rightOsc) {
+        try { AppState.nodes.rightOsc.stop(); } catch(e){}
+        AppState.nodes.rightOsc.disconnect();
+        AppState.nodes.rightOsc = null;
+    }
+    if (AppState.nodes.beatGain) {
         AppState.nodes.beatGain.disconnect();
-        AppState.nodes.leftOsc = null; AppState.nodes.rightOsc = null; AppState.nodes.beatGain = null;
+        AppState.nodes.beatGain = null;
     }
 }
 
 function killNoiseNodes() {
     if (AppState.nodes.noiseSrc) {
-        AppState.nodes.noiseSrc.stop(); AppState.nodes.noiseSrc.disconnect();
-        AppState.nodes.noiseFilter.disconnect(); AppState.nodes.noiseGain.disconnect();
-        AppState.nodes.noiseSrc = null; AppState.nodes.noiseFilter = null; AppState.nodes.noiseGain = null;
+        try { AppState.nodes.noiseSrc.stop(); } catch(e){}
+        AppState.nodes.noiseSrc.disconnect();
+        AppState.nodes.noiseSrc = null;
+    }
+    if (AppState.nodes.noiseFilter) {
+        AppState.nodes.noiseFilter.disconnect();
+        AppState.nodes.noiseFilter = null;
+    }
+    if (AppState.nodes.noiseGain) {
+        AppState.nodes.noiseGain.disconnect();
+        AppState.nodes.noiseGain = null;
     }
 }
 
@@ -240,25 +289,27 @@ function toggleTimer() {
         AppState.isRunning = false;
         clearInterval(AppState.timerInterval);
         
-        // Visual Reset
         btn.innerHTML = '<span>⚡</span> IGNITE';
         btn.style.color = 'var(--cyan)';
         btn.style.borderColor = 'rgba(0, 242, 255, 0.4)';
         btn.style.textShadow = '0 0 15px rgba(0, 242, 255, 0.5)';
         overlay.classList.remove('pulse-active');
-        slider.disabled = false; // Re-enable slider
+        slider.disabled = false; 
         
-        // Reset Timer Display visually to slider value
         let val = parseInt(slider.value);
         display.innerText = (val < 10 ? '0' + val : val) + ':00';
 
-        // Audio Fade Out
         if (AppState.audioCtx) {
-            AppState.masterGain.gain.linearRampToValueAtTime(0, AppState.audioCtx.currentTime + 2);
-            setTimeout(() => {
+            const now = AppState.audioCtx.currentTime;
+            // Anchor the current volume before ramping to 0
+            AppState.masterGain.gain.setValueAtTime(AppState.masterGain.gain.value, now);
+            AppState.masterGain.gain.linearRampToValueAtTime(0, now + 2);
+            
+            // Push to tracker to prevent conflicts
+            AppState.transitionTimers.push(setTimeout(() => {
                 killBeatNodes();
                 killNoiseNodes();
-            }, 2100);
+            }, 2100));
         }
 
     } else {
@@ -269,30 +320,31 @@ function toggleTimer() {
         }
 
         AppState.isRunning = true;
-        slider.disabled = true; // Lock the slider
+        slider.disabled = true; 
         AppState.remainingSeconds = parseInt(slider.value) * 60;
         
-        // Visual Update
         btn.innerHTML = '<span>⏏</span> ABORT';
-        btn.style.color = '#ff3366'; // Danger/Abort red
+        btn.style.color = '#ff3366'; 
         btn.style.borderColor = '#ff3366';
         btn.style.textShadow = '0 0 15px rgba(255, 51, 102, 0.5)';
         overlay.classList.add('pulse-active');
 
-        // Audio Fade In & Start
-        if (AppState.audioCtx && AppState.audioCtx.state === 'suspended') AppState.audioCtx.resume();
-        AppState.masterGain.gain.linearRampToValueAtTime(1, AppState.audioCtx.currentTime + 2);
-        rebuildAudioStream();
+        if (AppState.audioCtx) {
+            if (AppState.audioCtx.state === 'suspended') AppState.audioCtx.resume();
+            const now = AppState.audioCtx.currentTime;
+            // Force anchor at 0 before ramping to 1 (Fixes the Dead Master Gain)
+            AppState.masterGain.gain.setValueAtTime(0, now);
+            AppState.masterGain.gain.linearRampToValueAtTime(1, now + 2);
+            rebuildAudioStream();
+        }
 
-        // Start Chronometer
         updateDisplay();
         AppState.timerInterval = setInterval(() => {
             AppState.remainingSeconds--;
             updateDisplay();
 
             if (AppState.remainingSeconds <= 0) {
-                // Time's up
-                toggleTimer(); // Triggers abort logic smoothly
+                toggleTimer(); 
                 display.innerText = "DONE";
             }
         }, 1000);
@@ -309,3 +361,4 @@ function updateDisplay() {
     
     display.innerText = `${formattedMins}:${formattedSecs}`;
 }
+    
