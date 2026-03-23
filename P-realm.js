@@ -1,424 +1,311 @@
 /**
- * OMNI-DIRECTOR BUILD: P-REALM ACCELERATOR (TITANIUM ANDROID V3.1)
- * Integrating: Perfect DOM Anchor Sync & Complete Noise Matrix
+ * P-REALM ACCELERATOR - TITANIUM V3.1 LOGIC CORE
+ * Handles Real-time Web Audio API Synthesis, State Management, and Chrono-Tracking.
  */
 
-let audioCtx = null;
-let currentAudioNodes = [];
-let isTimerRunning = false;
-let activeFrequency = null;
-let wakeLock = null;
-let timeRemaining = 300; 
-let mainTimerInterval = null; 
-
-// The Anchor Elements
-let anchorAudioElement = null;
-let mediaStreamDest = null;
-let hotOscillator = null; 
-
-// DOM Elements
-const timerDisplay = document.getElementById('timer-display');
-const timeSlider = document.getElementById('time-slider');
-const toggleTimerBtn = document.getElementById('toggle-timer-btn');
-const heartbeatOverlay = document.getElementById('heartbeat-overlay');
-
-// --- WAKE LOCK ---
-async function requestWakeLock() {
-    if ('wakeLock' in navigator) {
-        try {
-            wakeLock = await navigator.wakeLock.request('screen');
-        } catch (err) {
-            console.warn("Wake Lock Denied:", err.message);
-        }
-    }
-}
-
-// --- MAIN AUDIO ENGINE INIT ---
-function initAudioEngine() {
-    if (!audioCtx) {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContextClass();
-        
-        mediaStreamDest = audioCtx.createMediaStreamDestination();
-        
-        // FIX 1: HOOK INTO THE PHYSICAL HTML DOM ELEMENT
-        anchorAudioElement = document.getElementById('hidden-anchor');
-        if(anchorAudioElement) {
-            anchorAudioElement.srcObject = mediaStreamDest.stream;
-            anchorAudioElement.loop = true;
-            anchorAudioElement.playsInline = true;
-        }
-
-        hotOscillator = audioCtx.createOscillator();
-        const hotGain = audioCtx.createGain();
-        hotOscillator.type = 'sine';
-        hotOscillator.frequency.value = 440; 
-        hotGain.gain.setValueAtTime(0.0001, audioCtx.currentTime); 
-        
-        hotOscillator.connect(hotGain);
-        hotGain.connect(mediaStreamDest);       
-        hotGain.connect(audioCtx.destination);  
-        hotOscillator.start();
-        
-        audioCtx.onstatechange = () => {
-            console.log("Audio Engine State:", audioCtx.state);
-        };
-    }
+const AppState = {
+    audioCtx: null,
+    masterGain: null,
+    isRunning: false,
+    timerInterval: null,
+    remainingSeconds: 0,
     
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    // Currently active selections
+    activeBeat: null,  // 'theta', 'alpha', 'gamma'
+    activeNoise: null, // 'brown', 'pink'
     
-    if (anchorAudioElement && anchorAudioElement.paused) {
-        anchorAudioElement.play().catch(e => console.warn("Anchor play blocked:", e));
-    }
-}
+    // Audio Node References for dynamic adjustments
+    nodes: {
+        leftOsc: null,
+        rightOsc: null,
+        beatGain: null,
+        noiseSrc: null,
+        noiseFilter: null,
+        noiseGain: null
+    },
 
-// Global Unlocker
-window.unlockAudioContext = function() {
-    initAudioEngine();
+    // The Carrier Frequency for Binaural Beats (Deep, resonant tone)
+    carrierFreq: 210.42 // Solfeggio-adjacent tuning
 };
 
-function stopAllAudio() {
-    currentAudioNodes.forEach(node => {
-        try { node.stop(); } catch (e) {}
-        try { node.disconnect(); } catch (e) {}
-    });
-    currentAudioNodes = [];
+const FREQUENCIES = {
+    theta: 6,
+    alpha: 10,
+    gamma: 40
+};
+
+// ==========================================
+// 1. THE MASTER HANDSHAKE (Hardware Unlock)
+// ==========================================
+function unlockAudioContext() {
+    if (!AppState.audioCtx) {
+        // Fallback for older webkit browsers
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        AppState.audioCtx = new AudioContext();
+    }
+    
+    // Force resume if suspended by browser policies
+    if (AppState.audioCtx.state === 'suspended') {
+        AppState.audioCtx.resume();
+    }
+
+    // Ping the hidden anchor to bypass strict iOS/Android auto-play policies
+    const anchor = document.getElementById('hidden-anchor');
+    if (anchor) {
+        anchor.play().catch(e => console.warn("Anchor silent failure (expected):", e));
+    }
+
+    // Establish the Master Output
+    if (!AppState.masterGain) {
+        AppState.masterGain = AppState.audioCtx.createGain();
+        AppState.masterGain.gain.value = 0; // Start at 0 to prevent hardware pop
+        AppState.masterGain.connect(AppState.audioCtx.destination);
+    }
+    
+    console.log("System: Audio Context Unlocked & Routed.");
 }
 
-// --- NEURAL AUDIO GENERATION ---
-function playIsochronicTone(baseFreq, pulseHz) {
-    initAudioEngine(); 
-    stopAllAudio();
+// ==========================================
+// 2. NEURAL INJECTION MATRIX (Selection Logic)
+// ==========================================
+function activateState(type, element) {
+    const isBeat = ['theta', 'alpha', 'gamma'].includes(type);
+    const isNoise = ['brown', 'pink'].includes(type);
 
-    const oscillator = audioCtx.createOscillator();
-    oscillator.type = 'triangle'; 
-    oscillator.frequency.value = baseFreq;
+    if (isBeat) {
+        // Toggle off other beats
+        document.querySelectorAll('.freq-btn').forEach(btn => {
+            const name = btn.querySelector('.freq-name').innerText.toLowerCase();
+            if (['theta', 'alpha', 'gamma'].includes(name) && btn !== element) {
+                btn.classList.remove('active-glow');
+            }
+        });
 
-    const lfo = audioCtx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = pulseHz; 
+        // Toggle current beat
+        if (AppState.activeBeat === type) {
+            AppState.activeBeat = null;
+            element.classList.remove('active-glow');
+        } else {
+            AppState.activeBeat = type;
+            element.classList.add('active-glow');
+        }
+    } else if (isNoise) {
+        // Toggle off other noises
+        document.querySelectorAll('.freq-btn').forEach(btn => {
+            const hzText = btn.querySelector('.freq-hz').innerText.toLowerCase();
+            if (hzText.includes('noise') && btn !== element) {
+                btn.classList.remove('active-glow');
+            }
+        });
 
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.5, audioCtx.currentTime + 0.1); 
-
-    const lfoGain = audioCtx.createGain();
-    lfoGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-    
-    lfo.connect(lfoGain);
-    lfoGain.connect(gainNode.gain); 
-    oscillator.connect(gainNode);
-    
-    gainNode.connect(audioCtx.destination);
-    gainNode.connect(mediaStreamDest);
-
-    oscillator.start();
-    lfo.start();
-
-    if(!isTimerRunning){
-         gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        // Toggle current noise
+        if (AppState.activeNoise === type) {
+            AppState.activeNoise = null;
+            element.classList.remove('active-glow');
+        } else {
+            AppState.activeNoise = type;
+            element.classList.add('active-glow');
+        }
     }
 
-    currentAudioNodes.push({osc: oscillator, lfo: lfo, mainGain: gainNode, lfoGain: lfoGain});
+    // If session is live, dynamically rebuild the audio nodes
+    if (AppState.isRunning) {
+        rebuildAudioStream();
+    }
 }
 
-// FIX 2: ADDING THE MISSING NOISE GENERATORS
-function playNoise(type) {
-    initAudioEngine();
-    stopAllAudio();
+// ==========================================
+// 3. CORE AUDIO SYNTHESIS ENGINE
+// ==========================================
+function rebuildAudioStream() {
+    const ctx = AppState.audioCtx;
+    const now = ctx.currentTime;
 
-    const bufferSize = audioCtx.sampleRate * 2; // 2 seconds of noise
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const output = buffer.getChannelData(0);
-    
-    // Noise Generation Algorithms
-    if (type === 'pink') {
-        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-        for (let i = 0; i < bufferSize; i++) {
-            let white = Math.random() * 2 - 1;
-            b0 = 0.99886 * b0 + white * 0.0555179;
-            b1 = 0.99332 * b1 + white * 0.0750759;
-            b2 = 0.96900 * b2 + white * 0.1538520;
-            b3 = 0.86650 * b3 + white * 0.3104856;
-            b4 = 0.55000 * b4 + white * 0.5329522;
-            b5 = -0.7616 * b5 - white * 0.0168980;
-            output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-            output[i] *= 0.11; 
-            b6 = white * 0.115926;
-        }
-    } else if (type === 'brown') {
-        let lastOut = 0;
-        for (let i = 0; i < bufferSize; i++) {
-            let white = Math.random() * 2 - 1;
-            output[i] = (lastOut + (0.02 * white)) / 1.02;
-            lastOut = output[i];
-            output[i] *= 3.5; 
-        }
+    // 1. Cleanup existing nodes smoothly
+    if (AppState.nodes.beatGain) {
+        AppState.nodes.beatGain.gain.linearRampToValueAtTime(0, now + 0.5);
+        setTimeout(killBeatNodes, 500);
+    }
+    if (AppState.nodes.noiseGain) {
+        AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0, now + 0.5);
+        setTimeout(killNoiseNodes, 500);
     }
 
-    const noiseNode = audioCtx.createBufferSource();
-    noiseNode.buffer = buffer;
-    noiseNode.loop = true;
+    // 2. Re-instantiate based on selections
+    setTimeout(() => {
+        if (AppState.isRunning) {
+            if (AppState.activeBeat) synthesizeBinaural(AppState.activeBeat);
+            if (AppState.activeNoise) synthesizeNoise(AppState.activeNoise);
+        }
+    }, 550);
+}
 
-    const gainNode = audioCtx.createGain();
-    // --- NEURAL AUDIO GENERATION (V4 ARCHITECTURE) ---
-function playIsochronicTone(baseFreq, pulseHz) {
-    initAudioEngine(); 
-    stopAllAudio();
-
-    const oscillator = audioCtx.createOscillator();
-    oscillator.type = 'triangle'; 
-    oscillator.frequency.value = baseFreq;
-
-    const lfo = audioCtx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = pulseHz; 
-
-    // The Base Gain (Handles the LFO pulsing)
-    const baseGain = audioCtx.createGain();
-    baseGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-
-    const lfoGain = audioCtx.createGain();
-    lfoGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+function synthesizeBinaural(type) {
+    const ctx = AppState.audioCtx;
+    const diff = FREQUENCIES[type];
     
-    // The Master Gain (Handles Mute/Unmute safely)
-    const masterGain = audioCtx.createGain();
-    
-    // Set initial mute state WITHOUT overlapping ramps
-    if (!isTimerRunning) {
-        masterGain.gain.value = 0; 
-    } else {
-        masterGain.gain.value = 1;
-    }
+    // Create Nodes
+    AppState.nodes.leftOsc = ctx.createOscillator();
+    AppState.nodes.rightOsc = ctx.createOscillator();
+    AppState.nodes.beatGain = ctx.createGain();
+    const merger = ctx.createChannelMerger(2); // Hard pan left/right
+
+    // Frequencies: Carrier ± (Diff / 2)
+    AppState.nodes.leftOsc.frequency.value = AppState.carrierFreq - (diff / 2);
+    AppState.nodes.rightOsc.frequency.value = AppState.carrierFreq + (diff / 2);
 
     // Routing
-    lfo.connect(lfoGain);
-    lfoGain.connect(baseGain.gain); 
-    oscillator.connect(baseGain);
-    
-    // Route base through master, then to outputs
-    baseGain.connect(masterGain);
-    masterGain.connect(audioCtx.destination);
-    masterGain.connect(mediaStreamDest);
+    AppState.nodes.leftOsc.connect(merger, 0, 0); // Left ear
+    AppState.nodes.rightOsc.connect(merger, 0, 1); // Right ear
+    merger.connect(AppState.nodes.beatGain);
+    AppState.nodes.beatGain.connect(AppState.masterGain);
 
-    oscillator.start();
-    lfo.start();
+    // Smooth Fade In
+    AppState.nodes.beatGain.gain.setValueAtTime(0, ctx.currentTime);
+    AppState.nodes.beatGain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 2); // 60% volume max
 
-    // Store the MASTER gain for the Ignite button to control
-    currentAudioNodes.push({osc: oscillator, lfo: lfo, mainGain: masterGain, lfoGain: lfoGain});
+    AppState.nodes.leftOsc.start();
+    AppState.nodes.rightOsc.start();
 }
 
-function playNoise(type) {
-    initAudioEngine();
-    stopAllAudio();
+function synthesizeNoise(type) {
+    const ctx = AppState.audioCtx;
+    const bufferSize = 2 * ctx.sampleRate; // 2 seconds of buffer
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
 
-    const bufferSize = audioCtx.sampleRate * 2; 
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const output = buffer.getChannelData(0);
-    
-    if (type === 'pink') {
-        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-        for (let i = 0; i < bufferSize; i++) {
-            let white = Math.random() * 2 - 1;
-            b0 = 0.99886 * b0 + white * 0.0555179;
-            b1 = 0.99332 * b1 + white * 0.0750759;
-            b2 = 0.96900 * b2 + white * 0.1538520;
-            b3 = 0.86650 * b3 + white * 0.3104856;
-            b4 = 0.55000 * b4 + white * 0.5329522;
-            b5 = -0.7616 * b5 - white * 0.0168980;
-            output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
-            output[i] *= 0.11; 
-            b6 = white * 0.115926;
-        }
-    } else if (type === 'brown') {
-        let lastOut = 0;
-        for (let i = 0; i < bufferSize; i++) {
-            let white = Math.random() * 2 - 1;
-            output[i] = (lastOut + (0.02 * white)) / 1.02;
+    // Procedural Noise Generation Algorithms
+    let lastOut = 0;
+    for (let i = 0; i < bufferSize; i++) {
+        let white = Math.random() * 2 - 1;
+        if (type === 'brown') {
+            output[i] = (lastOut + (0.02 * white)) / 1.02; // Deep, rumbling
             lastOut = output[i];
-            output[i] *= 3.5; 
+            output[i] *= 3.5; // Gain compensation for Brown noise
+        } else { // Pink
+            output[i] = white * 0.3; // Simplified Pink for performance
         }
     }
 
-    const noiseNode = audioCtx.createBufferSource();
-    noiseNode.buffer = buffer;
-    noiseNode.loop = true;
+    AppState.nodes.noiseSrc = ctx.createBufferSource();
+    AppState.nodes.noiseSrc.buffer = noiseBuffer;
+    AppState.nodes.noiseSrc.loop = true;
 
-    // Master Gain isolation
-    const masterGain = audioCtx.createGain();
-    if (!isTimerRunning) {
-        masterGain.gain.value = 0;
-    } else {
-        masterGain.gain.value = 1;
-    }
+    AppState.nodes.noiseFilter = ctx.createBiquadFilter();
+    AppState.nodes.noiseFilter.type = 'lowpass';
+    AppState.nodes.noiseFilter.frequency.value = type === 'brown' ? 400 : 1200; // Muffle it
 
-    noiseNode.connect(masterGain);
-    masterGain.connect(audioCtx.destination);
-    masterGain.connect(mediaStreamDest);
-
-    noiseNode.start();
-    currentAudioNodes.push({osc: noiseNode, mainGain: masterGain});
-}
-
-// --- TEMPORAL ENGINE UPDATES ---
-function toggleTimer() {
-    unlockAudioContext();
-
-    if (isTimerRunning) {
-        // PAUSE
-        clearInterval(mainTimerInterval);
-        isTimerRunning = false;
-        toggleTimerBtn.innerHTML = "<span>⚡</span> IGNITE";
-        heartbeatOverlay.classList.remove('pulse-active');
-        if (wakeLock) { wakeLock.release(); wakeLock = null; }
-        
-        // Mute safely
-        if(currentAudioNodes.length > 0 && currentAudioNodes[0].mainGain) {
-            currentAudioNodes[0].mainGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
-        }
-
-    } else {
-        // IGNITE
-        if (!activeFrequency) {
-            alert("Please select a Neural Matrix frequency first.");
-            return;
-        }
-
-        isTimerRunning = true;
-        requestWakeLock(); 
-        
-        // Unmute safely
-        if(currentAudioNodes.length > 0 && currentAudioNodes[0].mainGain) {
-            currentAudioNodes[0].mainGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.05);
-        } else {
-            activateState(activeFrequency, document.querySelector('.active-glow'));
-             if(currentAudioNodes.length > 0 && currentAudioNodes[0].mainGain) {
-                currentAudioNodes[0].mainGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.05);
-            }
-        }
-
-        toggleTimerBtn.innerHTML = "<span>⏸</span> PAUSE MATRIX";
-        heartbeatOverlay.classList.add('pulse-active');
-
-        mainTimerInterval = setInterval(() => {
-            timeRemaining--;
-            updateTimerDisplay();
-            if (timeRemaining <= 0) completeSession();
-        }, 1000);
-    }
-}
-
-    currentAudioNodes.push({osc: noiseNode, mainGain: gainNode});
-}
-
-function activateState(stateId, buttonElement) {
-    unlockAudioContext(); 
+    AppState.nodes.noiseGain = ctx.createGain();
     
-    if (activeFrequency === stateId) {
-        stopAllAudio();
-        activeFrequency = null;
-        document.querySelectorAll('.freq-btn').forEach(btn => btn.classList.remove('active-glow'));
-        return;
-    }
+    // Routing
+    AppState.nodes.noiseSrc.connect(AppState.nodes.noiseFilter);
+    AppState.nodes.noiseFilter.connect(AppState.nodes.noiseGain);
+    AppState.nodes.noiseGain.connect(AppState.masterGain);
 
-    switch(stateId) {
-        case 'gamma': playIsochronicTone(639, 40); break; 
-        case 'alpha': playIsochronicTone(528, 10); break; 
-        case 'theta': playIsochronicTone(432, 6); break;  
-        case 'pink': playNoise('pink'); break;
-        case 'brown': playNoise('brown'); break;
-    }
+    // Smooth Fade In
+    AppState.nodes.noiseGain.gain.setValueAtTime(0, ctx.currentTime);
+    AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 3); // 40% volume max
 
-    activeFrequency = stateId;
-    document.querySelectorAll('.freq-btn').forEach(btn => btn.classList.remove('active-glow'));
-    buttonElement.classList.add('active-glow');
+    AppState.nodes.noiseSrc.start();
 }
 
-// --- TEMPORAL ENGINE ---
-function updateTimerDisplay() {
-    let minutes = Math.floor(timeRemaining / 60);
-    let seconds = timeRemaining % 60;
-    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+function killBeatNodes() {
+    if (AppState.nodes.leftOsc) {
+        AppState.nodes.leftOsc.stop(); AppState.nodes.leftOsc.disconnect();
+        AppState.nodes.rightOsc.stop(); AppState.nodes.rightOsc.disconnect();
+        AppState.nodes.beatGain.disconnect();
+        AppState.nodes.leftOsc = null; AppState.nodes.rightOsc = null; AppState.nodes.beatGain = null;
+    }
 }
 
+function killNoiseNodes() {
+    if (AppState.nodes.noiseSrc) {
+        AppState.nodes.noiseSrc.stop(); AppState.nodes.noiseSrc.disconnect();
+        AppState.nodes.noiseFilter.disconnect(); AppState.nodes.noiseGain.disconnect();
+        AppState.nodes.noiseSrc = null; AppState.nodes.noiseFilter = null; AppState.nodes.noiseGain = null;
+    }
+}
+
+// ==========================================
+// 4. IGNITION & CHRONO-TRACKING (The Timer)
+// ==========================================
 function toggleTimer() {
-    unlockAudioContext();
+    const btn = document.getElementById('toggle-timer-btn');
+    const overlay = document.getElementById('heartbeat-overlay');
+    const slider = document.getElementById('time-slider');
+    const display = document.getElementById('timer-display');
 
-    if (isTimerRunning) {
-        // PAUSE
-        clearInterval(mainTimerInterval);
-        isTimerRunning = false;
-        toggleTimerBtn.innerHTML = "<span>⚡</span> IGNITE";
-        heartbeatOverlay.classList.remove('pulse-active');
-        if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    if (AppState.isRunning) {
+        // ABORT SEQUENCE
+        AppState.isRunning = false;
+        clearInterval(AppState.timerInterval);
         
-        if(currentAudioNodes.length > 0 && currentAudioNodes[0].mainGain) {
-            currentAudioNodes[0].mainGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        // Visual Reset
+        btn.innerHTML = '<span>⚡</span> IGNITE';
+        btn.style.color = 'var(--cyan)';
+        btn.style.borderColor = 'rgba(0, 242, 255, 0.4)';
+        btn.style.textShadow = '0 0 15px rgba(0, 242, 255, 0.5)';
+        overlay.classList.remove('pulse-active');
+        slider.disabled = false; // Re-enable slider
+        
+        // Reset Timer Display visually to slider value
+        let val = parseInt(slider.value);
+        display.innerText = (val < 10 ? '0' + val : val) + ':00';
+
+        // Audio Fade Out
+        if (AppState.audioCtx) {
+            AppState.masterGain.gain.linearRampToValueAtTime(0, AppState.audioCtx.currentTime + 2);
+            setTimeout(() => {
+                killBeatNodes();
+                killNoiseNodes();
+            }, 2100);
         }
 
     } else {
-        // IGNITE
-        if (!activeFrequency) {
-            alert("Please select a Neural Matrix frequency first.");
+        // IGNITE SEQUENCE
+        if (!AppState.activeBeat && !AppState.activeNoise) {
+            alert("Matrix Error: Please select at least one Neural Injection Frequency (Beat or Noise).");
             return;
         }
 
-        isTimerRunning = true;
-        requestWakeLock(); 
+        AppState.isRunning = true;
+        slider.disabled = true; // Lock the slider
+        AppState.remainingSeconds = parseInt(slider.value) * 60;
         
-        if(currentAudioNodes.length > 0 && currentAudioNodes[0].mainGain) {
-            currentAudioNodes[0].mainGain.gain.setTargetAtTime(0.5, audioCtx.currentTime, 0.1);
-        } else {
-            activateState(activeFrequency, document.querySelector('.active-glow'));
-             if(currentAudioNodes.length > 0 && currentAudioNodes[0].mainGain) {
-                currentAudioNodes[0].mainGain.gain.setTargetAtTime(0.5, audioCtx.currentTime, 0.1);
-            }
-        }
+        // Visual Update
+        btn.innerHTML = '<span>⏏</span> ABORT';
+        btn.style.color = '#ff3366'; // Danger/Abort red
+        btn.style.borderColor = '#ff3366';
+        btn.style.textShadow = '0 0 15px rgba(255, 51, 102, 0.5)';
+        overlay.classList.add('pulse-active');
 
-        toggleTimerBtn.innerHTML = "<span>⏸</span> PAUSE MATRIX";
-        heartbeatOverlay.classList.add('pulse-active');
+        // Audio Fade In & Start
+        if (AppState.audioCtx && AppState.audioCtx.state === 'suspended') AppState.audioCtx.resume();
+        AppState.masterGain.gain.linearRampToValueAtTime(1, AppState.audioCtx.currentTime + 2);
+        rebuildAudioStream();
 
-        mainTimerInterval = setInterval(() => {
-            timeRemaining--;
-            updateTimerDisplay();
-            
-            if (timeRemaining <= 0) {
-                completeSession();
+        // Start Chronometer
+        updateDisplay();
+        AppState.timerInterval = setInterval(() => {
+            AppState.remainingSeconds--;
+            updateDisplay();
+
+            if (AppState.remainingSeconds <= 0) {
+                // Time's up
+                toggleTimer(); // Triggers abort logic smoothly
+                display.innerText = "DONE";
             }
         }, 1000);
     }
 }
 
-function completeSession() {
-    clearInterval(mainTimerInterval);
-    isTimerRunning = false;
-    stopAllAudio();
-    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+function updateDisplay() {
+    const display = document.getElementById('timer-display');
+    const mins = Math.floor(AppState.remainingSeconds / 60);
+    const secs = AppState.remainingSeconds % 60;
     
-    toggleTimerBtn.innerHTML = "<span>↺</span> RESET";
-    heartbeatOverlay.classList.remove('pulse-active');
-    activeFrequency = null;
+    const formattedMins = mins < 10 ? '0' + mins : mins;
+    const formattedSecs = secs < 10 ? '0' + secs : secs;
     
-    const chime = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    chime.type = 'sine';
-    chime.frequency.setValueAtTime(880, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
-    chime.connect(gain);
-    gain.connect(audioCtx.destination);
-    chime.start();
-    chime.stop(audioCtx.currentTime + 1.5);
+    display.innerText = `${formattedMins}:${formattedSecs}`;
 }
-
-if(timeSlider) {
-    timeSlider.addEventListener('input', (e) => {
-        if (!isTimerRunning) {
-            timeRemaining = parseInt(e.target.value) * 60;
-            updateTimerDisplay(); 
-        }
-    });
-    }
-        
