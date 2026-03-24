@@ -132,12 +132,12 @@
 </head>
 <body class="flex flex-col items-center justify-center p-4">
 
-    <audio id="hidden-anchor" playsinline muted style="display:none;"></audio>
+    <audio id="hidden-anchor" playsinline muted style="position: absolute; opacity: 0; pointer-events: none;"></audio>
 
     <div id="unlock-screen" onclick="enterRealm()">
         <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,242,255,0.03)_0%,transparent_50%)] pointer-events-none"></div>
         <p class="mono-text text-[#00F2FF] opacity-50 mb-6 text-xs uppercase tracking-[0.3em] relative z-10">Initialize Interface</p>
-        <button class="px-10 py-4 border border-[#00F2FF]/40 text-[#00F2FF] uppercase tracking-[0.4em] text-sm hover:border-[#00F2FF] hover:bg-[#00F2FF]/5 hover:shadow-[0_0_30px_rgba(0,242,255,0.3)] transition-all duration-500 rounded-sm relative z-10">
+        <button class="px-10 py-4 border border-[#00F2FF]/40 text-[#00F2FF] uppercase tracking-[0.4em] text-sm pointer-events-none relative z-10 transition-all duration-500 rounded-sm">
             Enter P-Realm
         </button>
     </div>
@@ -215,19 +215,34 @@
     <script src="p-realm.js"></script>
     
     <script>
-        // THE MASTER HANDSHAKE FIX
+        // CRITICAL FIX 2: THE MASTER HANDSHAKE WITH SILENT PING
         function enterRealm() {
             console.log("Omni-Director: Handshake Initiated.");
             
             if(typeof unlockAudioContext === 'function') {
+                // 1. Fire the main unlock
                 unlockAudioContext();
-                console.log("Hardware Lock: Disengaged. Pipe is Hot.");
+                
+                // 2. THE SILENT PING: Force the hardware to 'RUNNING' state immediately
+                if (typeof AppState !== 'undefined' && AppState.audioCtx && AppState.audioCtx.state !== 'closed') {
+                    const oscillator = AppState.audioCtx.createOscillator();
+                    const gain = AppState.audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.0001, AppState.audioCtx.currentTime); 
+                    oscillator.connect(gain);
+                    gain.connect(AppState.audioCtx.destination);
+                    oscillator.start();
+                    oscillator.stop(AppState.audioCtx.currentTime + 0.001);
+                    console.log("Hardware Lock: PINGED. Engine is Hot.");
+                }
             } else {
-                console.error("Critical: p-realm.js not loaded or wrong version.");
+                console.error("Critical: p-realm.js not found in the directory.");
+                alert("System Error: p-realm.js missing.");
             }
             
+            // UI Transition
             const unlockScreen = document.getElementById('unlock-screen');
             unlockScreen.style.opacity = '0';
+            unlockScreen.style.pointerEvents = 'none'; // Prevent double-clicks
             setTimeout(() => {
                 unlockScreen.remove();
             }, 800);
