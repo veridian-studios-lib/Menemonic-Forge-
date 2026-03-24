@@ -178,29 +178,29 @@
         <div class="mb-5 text-[10px] mono-text opacity-50 text-center uppercase tracking-[0.2em]">NEURAL INJECTION MATRIX</div>
         
         <div class="grid grid-cols-3 gap-3 mb-3">
-            <div class="freq-btn" onclick="activateState('theta', this)">
+            <div class="freq-btn" data-type="theta" onclick="activateState('theta', this)">
                 <span class="freq-icon">🌊</span>
                 <span class="freq-name">Theta</span>
                 <span class="freq-hz">6 Hz</span>
             </div>
-            <div class="freq-btn" onclick="activateState('alpha', this)">
+            <div class="freq-btn" data-type="alpha" onclick="activateState('alpha', this)">
                 <span class="freq-icon">🍃</span>
                 <span class="freq-name">Alpha</span>
                 <span class="freq-hz">10 Hz</span>
             </div>
-            <div class="freq-btn" onclick="activateState('gamma', this)">
+            <div class="freq-btn" data-type="gamma" onclick="activateState('gamma', this)">
                 <span class="freq-icon">⚡</span>
                 <span class="freq-name">Gamma</span>
                 <span class="freq-hz">40 Hz</span>
             </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
-            <div class="freq-btn" onclick="activateState('brown', this)">
+            <div class="freq-btn" data-type="brown" onclick="activateState('brown', this)">
                 <span class="freq-icon">🤎</span>
                 <span class="freq-name">Deep Mask</span>
                 <span class="freq-hz">Brown Noise</span>
             </div>
-            <div class="freq-btn" onclick="activateState('pink', this)">
+            <div class="freq-btn" data-type="pink" onclick="activateState('pink', this)">
                 <span class="freq-icon">🩷</span>
                 <span class="freq-name">Focus Mask</span>
                 <span class="freq-hz">Pink Noise</span>
