@@ -1,7 +1,6 @@
 /**
- * P-REALM ACCELERATOR - TITANIUM V3.2 LOGIC CORE (MAXIMUM POWER)
- * Handles Real-time Web Audio API Synthesis, State Management, and Chrono-Tracking.
- * OS-Level Throttling Bypassed | Main Thread Optimized | Race Conditions Eliminated
+ * P-REALM ACCELERATOR - TITANIUM V3.3 LOGIC CORE (MAXIMUM POWER)
+ * Zero-Latency Ignition | Voss-McCartney Pink Noise | Hardware-Level Crossfading
  */
 
 const AppState = {
@@ -11,11 +10,10 @@ const AppState = {
     timerInterval: null,
     remainingSeconds: 0,
     
-    // Currently active selections
-    activeBeat: null,  // 'theta', 'alpha', 'gamma'
-    activeNoise: null, // 'brown', 'pink'
+    activeBeat: null,
+    activeNoise: null,
     
-    // Audio Node References for dynamic adjustments
+    // Audio Node References
     nodes: {
         leftOsc: null,
         rightOsc: null,
@@ -25,87 +23,86 @@ const AppState = {
         noiseGain: null
     },
 
-    // Pre-computed Noise Buffers (Prevents Main Thread Stutter)
     noiseBuffers: {
         brown: null,
         pink: null
     },
 
-    // Timeout Tracker (Prevents Race Conditions)
-    transitionTimers: [],
-
-    // The Carrier Frequency for Binaural Beats (Deep, resonant tone)
-    carrierFreq: 210.42 // Solfeggio-adjacent tuning
+    carrierFreq: 210.42 
 };
 
-const FREQUENCIES = {
-    theta: 6,
-    alpha: 10,
-    gamma: 40
-};
+const FREQUENCIES = { theta: 6, alpha: 10, gamma: 40 };
 
 // ==========================================
-// 1. THE MASTER HANDSHAKE (Hardware Unlock & Buffer Prep)
+// 1. THE MASTER HANDSHAKE
 // ==========================================
 function unlockAudioContext() {
     if (!AppState.audioCtx) {
-        // Fallback for older webkit browsers
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         AppState.audioCtx = new AudioContext();
     }
     
-    // Force resume if suspended by browser policies
     if (AppState.audioCtx.state === 'suspended') {
         AppState.audioCtx.resume();
     }
 
     const anchor = document.getElementById('hidden-anchor');
 
-    // Establish the Master Output
     if (!AppState.masterGain) {
         AppState.masterGain = AppState.audioCtx.createGain();
-        // FIX 1: Anchor the ramp starting point
         AppState.masterGain.gain.setValueAtTime(0, AppState.audioCtx.currentTime); 
         
-        // FIX 2: The Missing Link (MediaStreamDestination for OS Keep-Alive)
+        // The Missing Link: OS Keep-Alive via muted HTML5 Audio
         if (anchor) {
             const streamDest = AppState.audioCtx.createMediaStreamDestination();
             anchor.srcObject = streamDest.stream;
-            AppState.masterGain.connect(streamDest); // Pipe to dummy audio element
-            
-            // Note: We MUST also connect to the actual hardware destination to hear it, 
-            // since the HTML anchor is muted to prevent echoing/feedback.
+            AppState.masterGain.connect(streamDest); 
             AppState.masterGain.connect(AppState.audioCtx.destination); 
             
-            anchor.play().catch(e => console.warn("Anchor silent failure (expected):", e));
+            anchor.play().catch(e => console.warn("Anchor silent failure:", e));
         } else {
             AppState.masterGain.connect(AppState.audioCtx.destination);
         }
 
-        // FIX 3: Pre-compute Noise Buffers on Startup
         generateNoiseBuffers();
     }
     
-    console.log("System: Audio Context Unlocked, Routed, and Buffered.");
+    console.log("System: Master Handshake Complete. Engine Armed.");
 }
 
+// ==========================================
+// 2. TRUE PROCEDURAL NOISE (Voss-McCartney)
+// ==========================================
 function generateNoiseBuffers() {
     const ctx = AppState.audioCtx;
-    const bufferSize = 2 * ctx.sampleRate; // 2 seconds of buffer
+    const bufferSize = 2 * ctx.sampleRate; // 2 seconds
 
     ['brown', 'pink'].forEach(type => {
         const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const output = noiseBuffer.getChannelData(0);
-        let lastOut = 0;
         
-        for (let i = 0; i < bufferSize; i++) {
-            let white = Math.random() * 2 - 1;
-            if (type === 'brown') {
+        if (type === 'brown') {
+            let lastOut = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                let white = Math.random() * 2 - 1;
                 output[i] = (lastOut + (0.02 * white)) / 1.02; 
                 lastOut = output[i];
                 output[i] *= 3.5; // Gain compensation
-            } else { // Pink
-                output[i] = white * 0.3; 
+            }
+        } else {
+            // FIX: True Voss-McCartney Pink Noise Algorithm
+            let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0, b6=0;
+            for (let i = 0; i < bufferSize; i++) {
+                let white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                b2 = 0.96900 * b2 + white * 0.1538520;
+                b3 = 0.86650 * b3 + white * 0.3104856;
+                b4 = 0.55000 * b4 + white * 0.5329522;
+                b5 = -0.7616 * b5 - white * 0.0168980;
+                output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+                output[i] *= 0.11; // Normalize gain
+                b6 = white * 0.115926;
             }
         }
         AppState.noiseBuffers[type] = noiseBuffer;
@@ -113,43 +110,32 @@ function generateNoiseBuffers() {
 }
 
 // ==========================================
-// 2. NEURAL INJECTION MATRIX (Selection Logic)
+// 3. NEURAL INJECTION MATRIX
 // ==========================================
 function activateState(type, element) {
     const isBeat = ['theta', 'alpha', 'gamma'].includes(type);
     const isNoise = ['brown', 'pink'].includes(type);
 
+    // FIX: Titanium String Logic using dataset attributes
     if (isBeat) {
         document.querySelectorAll('.freq-btn').forEach(btn => {
-            const name = btn.querySelector('.freq-name').innerText.toLowerCase();
-            if (['theta', 'alpha', 'gamma'].includes(name) && btn !== element) {
+            const btnType = btn.dataset.type;
+            if (['theta', 'alpha', 'gamma'].includes(btnType) && btn !== element) {
                 btn.classList.remove('active-glow');
             }
         });
-
-        if (AppState.activeBeat === type) {
-            AppState.activeBeat = null;
-            element.classList.remove('active-glow');
-        } else {
-            AppState.activeBeat = type;
-            element.classList.add('active-glow');
-        }
+        AppState.activeBeat = AppState.activeBeat === type ? null : type;
     } else if (isNoise) {
         document.querySelectorAll('.freq-btn').forEach(btn => {
-            const hzText = btn.querySelector('.freq-hz').innerText.toLowerCase();
-            if (hzText.includes('noise') && btn !== element) {
+            const btnType = btn.dataset.type;
+            if (['brown', 'pink'].includes(btnType) && btn !== element) {
                 btn.classList.remove('active-glow');
             }
         });
-
-        if (AppState.activeNoise === type) {
-            AppState.activeNoise = null;
-            element.classList.remove('active-glow');
-        } else {
-            AppState.activeNoise = type;
-            element.classList.add('active-glow');
-        }
+        AppState.activeNoise = AppState.activeNoise === type ? null : type;
     }
+
+    element.classList.toggle('active-glow');
 
     if (AppState.isRunning) {
         rebuildAudioStream();
@@ -157,36 +143,42 @@ function activateState(type, element) {
 }
 
 // ==========================================
-// 3. CORE AUDIO SYNTHESIS ENGINE
+// 4. SYNCHRONOUS HARDWARE ROUTING
 // ==========================================
 function rebuildAudioStream() {
     const ctx = AppState.audioCtx;
     const now = ctx.currentTime;
 
-    // FIX 4: Clear pending teardown timers to prevent Race Conditions
-    AppState.transitionTimers.forEach(clearTimeout);
-    AppState.transitionTimers = [];
-
-    // 1. Cleanup existing nodes smoothly
+    // FIX: No setTimeout. Schedule deaths on the hardware clock directly.
     if (AppState.nodes.beatGain) {
-        // Anchor the current gain value before ramping down
         AppState.nodes.beatGain.gain.setValueAtTime(AppState.nodes.beatGain.gain.value, now);
         AppState.nodes.beatGain.gain.linearRampToValueAtTime(0, now + 0.5);
-        AppState.transitionTimers.push(setTimeout(killBeatNodes, 500));
+        
+        AppState.nodes.leftOsc.stop(now + 0.6);
+        AppState.nodes.rightOsc.stop(now + 0.6);
+        
+        // Detach references so GC can clean them up, making room for new ones instantly
+        AppState.nodes.leftOsc = null;
+        AppState.nodes.rightOsc = null;
+        AppState.nodes.beatGain = null;
     }
+
     if (AppState.nodes.noiseGain) {
         AppState.nodes.noiseGain.gain.setValueAtTime(AppState.nodes.noiseGain.gain.value, now);
         AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0, now + 0.5);
-        AppState.transitionTimers.push(setTimeout(killNoiseNodes, 500));
+        
+        AppState.nodes.noiseSrc.stop(now + 0.6);
+        
+        AppState.nodes.noiseSrc = null;
+        AppState.nodes.noiseFilter = null;
+        AppState.nodes.noiseGain = null;
     }
 
-    // 2. Re-instantiate based on selections
-    AppState.transitionTimers.push(setTimeout(() => {
-        if (AppState.isRunning) {
-            if (AppState.activeBeat) synthesizeBinaural(AppState.activeBeat);
-            if (AppState.activeNoise) synthesizeNoise(AppState.activeNoise);
-        }
-    }, 550));
+    // IGNITE NEW NODES SYNCHRONOUSLY
+    if (AppState.isRunning) {
+        if (AppState.activeBeat) synthesizeBinaural(AppState.activeBeat);
+        if (AppState.activeNoise) synthesizeNoise(AppState.activeNoise);
+    }
 }
 
 function synthesizeBinaural(type) {
@@ -207,12 +199,13 @@ function synthesizeBinaural(type) {
     merger.connect(AppState.nodes.beatGain);
     AppState.nodes.beatGain.connect(AppState.masterGain);
 
-    // Fade In Anchor
+    // Keep silent at creation, fade in mathematically
     AppState.nodes.beatGain.gain.setValueAtTime(0, now);
-    AppState.nodes.beatGain.gain.linearRampToValueAtTime(0.6, now + 2); 
+    AppState.nodes.beatGain.gain.linearRampToValueAtTime(0.6, now + 1.0); 
 
-    AppState.nodes.leftOsc.start();
-    AppState.nodes.rightOsc.start();
+    // Synchronous execution satisfies iOS/Android tap-bubble rules
+    AppState.nodes.leftOsc.start(now);
+    AppState.nodes.rightOsc.start(now);
 }
 
 function synthesizeNoise(type) {
@@ -220,7 +213,6 @@ function synthesizeNoise(type) {
     const now = ctx.currentTime;
 
     AppState.nodes.noiseSrc = ctx.createBufferSource();
-    // Use the Pre-computed Buffer (No Main Thread Stutter)
     AppState.nodes.noiseSrc.buffer = AppState.noiseBuffers[type]; 
     AppState.nodes.noiseSrc.loop = true;
 
@@ -234,55 +226,23 @@ function synthesizeNoise(type) {
     AppState.nodes.noiseFilter.connect(AppState.nodes.noiseGain);
     AppState.nodes.noiseGain.connect(AppState.masterGain);
 
-    // Fade In Anchor
+    // Keep silent at creation, fade in mathematically
     AppState.nodes.noiseGain.gain.setValueAtTime(0, now);
-    AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0.4, now + 3); 
+    AppState.nodes.noiseGain.gain.linearRampToValueAtTime(0.4, now + 1.5); 
 
-    AppState.nodes.noiseSrc.start();
-}
-
-function killBeatNodes() {
-    // Try-Catch block bulletproofs against rapid toggle race conditions
-    if (AppState.nodes.leftOsc) {
-        try { AppState.nodes.leftOsc.stop(); } catch(e){}
-        AppState.nodes.leftOsc.disconnect();
-        AppState.nodes.leftOsc = null;
-    }
-    if (AppState.nodes.rightOsc) {
-        try { AppState.nodes.rightOsc.stop(); } catch(e){}
-        AppState.nodes.rightOsc.disconnect();
-        AppState.nodes.rightOsc = null;
-    }
-    if (AppState.nodes.beatGain) {
-        AppState.nodes.beatGain.disconnect();
-        AppState.nodes.beatGain = null;
-    }
-}
-
-function killNoiseNodes() {
-    if (AppState.nodes.noiseSrc) {
-        try { AppState.nodes.noiseSrc.stop(); } catch(e){}
-        AppState.nodes.noiseSrc.disconnect();
-        AppState.nodes.noiseSrc = null;
-    }
-    if (AppState.nodes.noiseFilter) {
-        AppState.nodes.noiseFilter.disconnect();
-        AppState.nodes.noiseFilter = null;
-    }
-    if (AppState.nodes.noiseGain) {
-        AppState.nodes.noiseGain.disconnect();
-        AppState.nodes.noiseGain = null;
-    }
+    // Synchronous execution
+    AppState.nodes.noiseSrc.start(now);
 }
 
 // ==========================================
-// 4. IGNITION & CHRONO-TRACKING (The Timer)
+// 5. IGNITION & CHRONO-TRACKING
 // ==========================================
 function toggleTimer() {
     const btn = document.getElementById('toggle-timer-btn');
     const overlay = document.getElementById('heartbeat-overlay');
     const slider = document.getElementById('time-slider');
     const display = document.getElementById('timer-display');
+    const now = AppState.audioCtx ? AppState.audioCtx.currentTime : 0;
 
     if (AppState.isRunning) {
         // ABORT SEQUENCE
@@ -300,22 +260,19 @@ function toggleTimer() {
         display.innerText = (val < 10 ? '0' + val : val) + ':00';
 
         if (AppState.audioCtx) {
-            const now = AppState.audioCtx.currentTime;
-            // Anchor the current volume before ramping to 0
             AppState.masterGain.gain.setValueAtTime(AppState.masterGain.gain.value, now);
-            AppState.masterGain.gain.linearRampToValueAtTime(0, now + 2);
+            AppState.masterGain.gain.linearRampToValueAtTime(0, now + 1.0);
             
-            // Push to tracker to prevent conflicts
-            AppState.transitionTimers.push(setTimeout(() => {
-                killBeatNodes();
-                killNoiseNodes();
-            }, 2100));
+            // Cleanly stop via hardware clock
+            setTimeout(() => {
+                rebuildAudioStream(); // Calling this while isRunning=false cleans up active nodes natively
+            }, 1100);
         }
 
     } else {
         // IGNITE SEQUENCE
         if (!AppState.activeBeat && !AppState.activeNoise) {
-            alert("Matrix Error: Please select at least one Neural Injection Frequency (Beat or Noise).");
+            alert("Matrix Error: Please select at least one Neural Injection Frequency.");
             return;
         }
 
@@ -331,10 +288,10 @@ function toggleTimer() {
 
         if (AppState.audioCtx) {
             if (AppState.audioCtx.state === 'suspended') AppState.audioCtx.resume();
-            const now = AppState.audioCtx.currentTime;
-            // Force anchor at 0 before ramping to 1 (Fixes the Dead Master Gain)
+            
+            // Synchronous rebuild + hardware crossfade
             AppState.masterGain.gain.setValueAtTime(0, now);
-            AppState.masterGain.gain.linearRampToValueAtTime(1, now + 2);
+            AppState.masterGain.gain.linearRampToValueAtTime(1, now + 1.0);
             rebuildAudioStream();
         }
 
@@ -360,5 +317,4 @@ function updateDisplay() {
     const formattedSecs = secs < 10 ? '0' + secs : secs;
     
     display.innerText = `${formattedMins}:${formattedSecs}`;
-}
-    
+                }
