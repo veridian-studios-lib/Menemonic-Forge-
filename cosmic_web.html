@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cosmic Web | Mnemonic Forge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=JetBrains+Mono:wght@300&family=Fauna+One&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --ember: #FF8C00; 
+            --void-bg: #020205; 
+            --sea-bg: rgba(10, 15, 30, 0.9);
+            --blue-orb: #3b82f6;
+            --red-orb: #ef4444;
+        }
+        
+        body { 
+            background: var(--void-bg); 
+            color: white; 
+            font-family: 'Fauna One', serif; 
+            overflow: hidden; 
+            margin: 0;
+            touch-action: none; /* Prevents mobile pull-to-refresh */
+        }
+
+        /* The SVG Canvas for Relation Lines */
+        #relation-layer {
+            position: fixed; inset: 0; z-index: 1; pointer-events: none;
+        }
+        .relation-line {
+            pointer-events: auto; /* Make lines clickable */
+            cursor: pointer;
+            stroke: rgba(255, 140, 0, 0.4);
+            stroke-width: 2;
+            transition: stroke 0.3s, filter 0.3s;
+        }
+        .relation-line:hover {
+            stroke: rgba(255, 140, 0, 1);
+            filter: drop-shadow(0 0 8px #FF8C00);
+            stroke-width: 4;
+        }
+
+        /* The Orbs */
+        #orb-layer { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+        
+        .orb {
+            position: absolute;
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: auto;
+            cursor: grab;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 0 20px currentColor, inset 0 0 10px currentColor;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), currentColor);
+            transition: box-shadow 0.3s, border 0.3s;
+        }
+        .orb:active { cursor: grabbing; }
+        .orb .orb-label {
+            position: absolute; top: 35px;
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            white-space: nowrap; opacity: 0.7; pointer-events: none;
+            text-transform: uppercase; letter-spacing: 0.1em; text-shadow: 0 0 5px black;
+        }
+
+        /* UI & Zones */
+        .ui-layer { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+        .interactive { pointer-events: auto; }
+        
+        .sea-zone {
+            height: 25vh; width: 100%;
+            background: linear-gradient(to top, var(--sea-bg), transparent);
+            border-top: 1px dashed rgba(59, 130, 246, 0.3);
+            display: flex; align-items: flex-end; justify-content: center; padding-bottom: 20px;
+            pointer-events: none;
+        }
+
+        /* Modals */
+        .modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+            z-index: 100; pointer-events: auto;
+            align-items: center; justify-content: center; opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .modal.active { display: flex; opacity: 1; }
+        .modal-content {
+            background: #0a0a0a; border: 1px solid rgba(255, 140, 0, 0.2);
+            padding: 30px; border-radius: 4px; box-shadow: 0 20px 50px rgba(0,0,0,1);
+            width: 90%; max-width: 450px; text-align: center;
+        }
+
+        .btn-forge {
+            background: transparent; border: 1px solid var(--ember); color: var(--ember);
+            padding: 12px 24px; text-transform: uppercase; letter-spacing: 0.2em; font-size: 10px;
+            font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.3s;
+        }
+        .btn-forge:hover { background: rgba(255, 140, 0, 0.1); box-shadow: 0 0 15px rgba(255, 140, 0, 0.4); }
+
+        .btn-ascend { border-color: var(--blue-orb); color: var(--blue-orb); }
+        .btn-ascend:hover { background: rgba(59, 130, 246, 0.1); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+
+        .mode-toggle { border: 1px solid rgba(255,255,255,0.2); color: white; }
+        .mode-toggle.active { border-color: #ef4444; color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+
+        input, textarea {
+            width: 100%; background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.2);
+            color: white; padding: 10px; margin-bottom: 20px; outline: none; font-family: 'Fauna One', serif;
+        }
+        input:focus, textarea:focus { border-bottom-color: var(--ember); }
+        textarea { height: 120px; resize: none; }
+    </style>
+</head>
+<body>
+
+    <svg id="relation-layer"></svg>
+
+    <div id="orb-layer"></div>
+
+    <div class="ui-layer">
+        <div class="p-6 flex justify-between items-start interactive">
+            <button onclick="window.location.href='index.html'" class="text-[#FF8C00] opacity-50 hover:opacity-100 font-mono text-[10px] tracking-widest">// RETURN</button>
+            <div class="text-right">
+                <h1 class="text-xl font-bold tracking-[0.4em] uppercase text-[#FF8C00]" style="font-family: 'Cinzel', serif;">The Void</h1>
+                <button id="linkModeBtn" onclick="toggleLinkMode()" class="mt-2 interactive btn-forge mode-toggle text-[8px] py-1 px-2">MODE: MOVE ORBS</button>
+            </div>
+        </div>
+
+        <div class="sea-zone interactive flex-col">
+            <p class="text-[10px] uppercase tracking-[0.4em] opacity-40 mb-4" style="font-family: 'Cinzel', serif;">The Sea of Whispers</p>
+            <button onclick="openModal('modal-add-wisdom')" class="btn-forge">+ Add Wisdom</button>
+        </div>
+    </div>
+
+    <div id="modal-add-wisdom" class="modal">
+        <div class="modal-content">
+            <h2 class="font-serif text-2xl mb-6 tracking-widest text-[#FF8C00]" style="font-family: 'Cinzel', serif;">The Scriptorium</h2>
+            <input id="wisdom-title" type="text" placeholder="TITLE OF SEED">
+            <textarea id="wisdom-content" placeholder="Inscribe your knowledge..."></textarea>
+            <div class="flex justify-between items-center mt-4">
+                <button onclick="closeModal('modal-add-wisdom')" class="text-[10px] font-mono uppercase opacity-40 hover:opacity-100">Cancel</button>
+                <button onclick="commitWisdom()" class="btn-forge">Commit to Sea</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-add-relation" class="modal">
+        <div class="modal-content">
+            <h2 class="font-serif text-xl mb-6 tracking-widest text-[#FF8C00]" style="font-family: 'Cinzel', serif;">Forge Connection</h2>
+            <p id="relation-nodes-text" class="text-[10px] font-mono opacity-50 mb-4 uppercase"></p>
+            <input id="relation-title" type="text" placeholder="NAME OF BOND (e.g. Causes, Leads to)">
+            <textarea id="relation-content" placeholder="Describe how these concepts connect..."></textarea>
+            <div class="flex justify-between items-center mt-4">
+                <button onclick="closeModal('modal-add-relation')" class="text-[10px] font-mono uppercase opacity-40 hover:opacity-100">Cancel</button>
+                <button onclick="commitRelation()" class="btn-forge">Fuse Nodes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-orb-info" class="modal">
+        <div class="modal-content flex flex-col items-center">
+            <div id="info-orb-display" class="w-16 h-16 rounded-full mb-6" style="box-shadow: 0 0 30px currentColor; background: currentColor;"></div>
+            <h2 id="info-title" class="font-serif text-2xl mb-2 tracking-widest" style="font-family: 'Cinzel', serif;">Title</h2>
+            <p id="info-status" class="text-[9px] font-mono opacity-50 mb-6 uppercase tracking-widest"></p>
+            <div id="info-content" class="text-sm italic opacity-80 mb-8 leading-relaxed text-justify">Content</div>
+            
+            <div class="flex w-full justify-between items-center border-t border-white/10 pt-4">
+                <button onclick="closeModal('modal-orb-info')" class="text-[10px] font-mono uppercase opacity-40 hover:opacity-100">Close</button>
+                <div id="info-action-container">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-relation-info" class="modal">
+        <div class="modal-content">
+            <h2 id="rel-info-title" class="font-serif text-xl mb-2 tracking-widest text-[#FF8C00]" style="font-family: 'Cinzel', serif;">Bond</h2>
+            <p id="rel-info-nodes" class="text-[9px] font-mono opacity-50 mb-6 uppercase tracking-widest"></p>
+            <div id="rel-info-content" class="text-sm italic opacity-80 mb-8 leading-relaxed text-justify">Content</div>
+            <div class="flex justify-center border-t border-white/10 pt-4">
+                <button onclick="closeModal('modal-relation-info')" class="text-[10px] font-mono uppercase opacity-40 hover:opacity-100">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. STATE & DATA STRUCTURE ---
+        let orbs = JSON.parse(localStorage.getItem('mnemonic_orbs')) || [];
+        let relations = JSON.parse(localStorage.getItem('mnemonic_relations')) || [];
+        
+        let linkMode = false; // False = Move, True = Connect
+        let selectedForLink = null;
+        let activeOrbId = null;
+        let activeRelationId = null;
+
+        // Interaction States
+        let draggedOrb = null;
+        let tempLine = null;
+
+        // --- 2. CORE LOGIC (Color Decay) ---
+        // Blue (59, 130, 246) to Red (239, 68, 68)
+        function calculateOrbColor(lastRevised) {
+            const decayTimeMs = 7 * 24 * 60 * 60 * 1000; // 7 Days. Change to 60000 (1 min) for quick testing.
+            const elapsed = Date.now() - lastRevised;
+            let ratio = Math.min(elapsed / decayTimeMs, 1);
+            
+            const r = Math.round(59 + (239 - 59) * ratio);
+            const g = Math.round(130 + (68 - 130) * ratio);
+            const b = Math.round(246 + (68 - 246) * ratio);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function saveData() {
+            localStorage.setItem('mnemonic_orbs', JSON.stringify(orbs));
+            localStorage.setItem('mnemonic_relations', JSON.stringify(relations));
+        }
+
+        // --- 3. RENDERING ENGINE ---
+        function renderWeb() {
+            const orbLayer = document.getElementById('orb-layer');
+            const svgLayer = document.getElementById('relation-layer');
+            orbLayer.innerHTML = '';
+            svgLayer.innerHTML = '';
+
+            // Draw Relations
+            relations.forEach(rel => {
+                const orbA = orbs.find(o => o.id === rel.sourceId);
+                const orbB = orbs.find(o => o.id === rel.targetId);
+                if(orbA && orbB) {
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", orbA.x); line.setAttribute("y1", orbA.y);
+                    line.setAttribute("x2", orbB.x); line.setAttribute("y2", orbB.y);
+                    line.classList.add("relation-line");
+                    line.onclick = () => openRelationInfo(rel.id);
+                    svgLayer.appendChild(line);
+                }
+            });
+
+            // Draw Orbs
+            orbs.forEach(orb => {
+                const el = document.createElement('div');
+                el.classList.add('orb');
+                el.style.left = `${orb.x}px`;
+                el.style.top = `${orb.y}px`;
+                
+                // Color logic: Sea = White/Blue, Void = Decay Color
+                const orbColor = orb.status === 'sea' ? 'var(--blue-orb)' : calculateOrbColor(orb.lastRevised);
+                el.style.color = orbColor;
+
+                // Selection Highlight for Link Mode
+                if(selectedForLink === orb.id) {
+                    el.style.border = "2px solid #fff";
+                    el.style.transform = "translate(-50%, -50%) scale(1.2)";
+                }
+
+                const label = document.createElement('div');
+                label.classList.add('orb-label');
+                label.innerText = orb.title;
+                el.appendChild(label);
+
+                // Events
+                el.onpointerdown = (e) => handleOrbPointerDown(e, orb);
+                orbLayer.appendChild(el);
+            });
+        }
+
+        // Render Loop for real-time decay updates
+        setInterval(renderWeb, 60000); // Re-render every minute to update decay
+
+        // --- 4. INTERACTION PHYSICS (Drag & Drop / Linking) ---
+        function handleOrbPointerDown(e, orb) {
+            e.stopPropagation();
+            if (linkMode) {
+                if (!selectedForLink) {
+                    selectedForLink = orb.id; // Pick first orb
+                    renderWeb();
+                } else if (selectedForLink !== orb.id) {
+                    // Pick second orb and trigger link Scriptorium
+                    document.getElementById('relation-nodes-text').innerText = 
+                        `Linking: ${orbs.find(o=>o.id==selectedForLink).title} -> ${orb.title}`;
+                    openModal('modal-add-relation');
+                } else {
+                    selectedForLink = null; // Deselect
+                    renderWeb();
+                }
+            } else {
+                // Move Mode
+                draggedOrb = orb;
+            }
+        }
+
+        // Window Pointer Events for Dragging
+        window.addEventListener('pointermove', (e) => {
+            if (draggedOrb) {
+                draggedOrb.x = e.clientX;
+                draggedOrb.y = e.clientY;
+                renderWeb();
+            }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (draggedOrb) {
+                // Check if dragging, or if it was just a click
+                // For simplicity: If we release, save state. 
+                // We open Info page via a separate mechanic or if distance moved is 0.
+                saveData();
+                draggedOrb = null;
+            }
+        });
+
+        // Click detection without dragging
+        let clickStart = {x: 0, y: 0};
+        window.addEventListener('pointerdown', (e) => { clickStart = {x: e.clientX, y: e.clientY}; });
+        window.addEventListener('pointerup', (e) => {
+            if(!draggedOrb && !linkMode) {
+                const dist = Math.hypot(e.clientX - clickStart.x, e.clientY - clickStart.y);
+                if (dist < 5) {
+                    // It was a clean click. Check if it hit an orb.
+                    const target = e.target.closest('.orb');
+                    if (target) {
+                        const title = target.querySelector('.orb-label').innerText;
+                        const orb = orbs.find(o => o.title === title);
+                        if (orb) openOrbInfo(orb.id);
+                    }
+                }
+            }
+        });
+
+        function toggleLinkMode() {
+            linkMode = !linkMode;
+            const btn = document.getElementById('linkModeBtn');
+            btn.classList.toggle('active', linkMode);
+            btn.innerText = linkMode ? "MODE: FORGE LINKS (TAP 2 ORBS)" : "MODE: MOVE ORBS";
+            selectedForLink = null;
+            renderWeb();
+        }
+
+        // --- 5. DATA MUTATIONS (Adding, Ascending, Revising) ---
+        function commitWisdom() {
+            const title = document.getElementById('wisdom-title').value;
+            const content = document.getElementById('wisdom-content').value;
+            if(!title) return;
+
+            // Spawn in the "Sea" (Bottom 20% of screen)
+            const spawnX = window.innerWidth / 2 + (Math.random() * 40 - 20);
+            const spawnY = window.innerHeight - 80 + (Math.random() * 20 - 10);
+
+            orbs.push({
+                id: Date.now().toString(),
+                title: title,
+                content: content,
+                x: spawnX, y: spawnY,
+                status: 'sea',
+                lastRevised: Date.now()
+            });
+
+            document.getElementById('wisdom-title').value = '';
+            document.getElementById('wisdom-content').value = '';
+            saveData(); renderWeb(); closeModal('modal-add-wisdom');
+        }
+
+        function commitRelation() {
+            const title = document.getElementById('relation-title').value;
+            const content = document.getElementById('relation-content').value;
+            if(!title || !selectedForLink) return;
+
+            // Find the orb we hovered/clicked on last (stored in a temp variable, handled by event)
+            // Wait, we need to pass the target orb ID.
+            // Hacky but effective: The target is the orb we clicked second. We didn't store it yet.
+            // Let's modify handleOrbPointerDown to pass it here.
+            // Done.
+            
+            // To fix scoping, selectedForLink is Orb A. We need Orb B.
+            // I'll grab Orb B from the global state I'll create.
+            // Actually, in `handleOrbPointerDown` I called `openModal('modal-add-relation')`.
+            // Let's set a global `targetForLink`.
+        }
+
+        // Proper Link Commit
+        let targetForLink = null;
+        const oldHandle = handleOrbPointerDown;
+        handleOrbPointerDown = function(e, orb) {
+            e.stopPropagation();
+            if (linkMode) {
+                if (!selectedForLink) {
+                    selectedForLink = orb.id; renderWeb();
+                } else if (selectedForLink !== orb.id) {
+                    targetForLink = orb.id;
+                    document.getElementById('relation-nodes-text').innerText = 
+                        `${orbs.find(o=>o.id==selectedForLink).title} ↔ ${orb.title}`;
+                    openModal('modal-add-relation');
+                } else { selectedForLink = null; renderWeb(); }
+            } else { draggedOrb = orb; }
+        }
+
+        function commitRelation() {
+            const title = document.getElementById('relation-title').value;
+            const content = document.getElementById('relation-content').value;
+            
+            relations.push({
+                id: 'rel-' + Date.now(),
+                sourceId: selectedForLink,
+                targetId: targetForLink,
+                title: title, content: content
+            });
+
+            selectedForLink = null; targetForLink = null;
+            document.getElementById('relation-title').value = ''; document.getElementById('relation-content').value = '';
+            toggleLinkMode(); // Turn off link mode after success
+            saveData(); renderWeb(); closeModal('modal-add-relation');
+        }
+
+        function ascendOrb() {
+            const orb = orbs.find(o => o.id === activeOrbId);
+            orb.status = 'void';
+            orb.lastRevised = Date.now();
+            
+            // Physically move it up into the void
+            orb.y = window.innerHeight * 0.4 + (Math.random() * 50 - 25);
+            
+            saveData(); renderWeb(); closeModal('modal-orb-info');
+        }
+
+        function reviseOrb() {
+            const orb = orbs.find(o => o.id === activeOrbId);
+            orb.lastRevised = Date.now(); // Reset decay timer
+            saveData(); renderWeb(); closeModal('modal-orb-info');
+        }
+
+        // --- 6. MODAL HANDLERS ---
+        function openModal(id) { 
+            const m = document.getElementById(id);
+            m.style.display = 'flex';
+            setTimeout(() => m.classList.add('active'), 10);
+        }
+        
+        function closeModal(id) { 
+            const m = document.getElementById(id);
+            m.classList.remove('active');
+          setTimeout(() => m.style.display = 'none', 300);
+        }
+
+        function openOrbInfo(id) {
+            activeOrbId = id;
+            const orb = orbs.find(o => o.id === id);
+            
+            document.getElementById('info-title').innerText = orb.title;
+            document.getElementById('info-content').innerText = orb.content;
+            document.getElementById('info-status').innerText = `Location: The ${orb.status}`;
+            
+            const color = orb.status === 'sea' ? 'var(--blue-orb)' : calculateOrbColor(orb.lastRevised);
+            document.getElementById('info-orb-display').style.color = color;
+
+            const actionContainer = document.getElementById('info-action-container');
+            if(orb.status === 'sea') {
+                actionContainer.innerHTML = `<button onclick="ascendOrb()" class="btn-forge btn-ascend">Ascend to Void</button>`;
+            } else {
+                actionContainer.innerHTML = `<button onclick="reviseOrb()" class="btn-forge">Mark Revised</button>`;
+            }
+            openModal('modal-orb-info');
+        }
+
+        function openRelationInfo(id) {
+            const rel = relations.find(r => r.id === id);
+            const orbA = orbs.find(o => o.id === rel.sourceId);
+            const orbB = orbs.find(o => o.id === rel.targetId);
+            
+            document.getElementById('rel-info-title').innerText = rel.title;
+            document.getElementById('rel-info-nodes').innerText = `${orbA.title} ↔ ${orbB.title}`;
+            document.getElementById('rel-info-content').innerText = rel.content;
+            
+            openModal('modal-relation-info');
+        }
+
+        // Initialize Web
+        renderWeb();
+    </script>
+</body>
+</html>
