@@ -172,27 +172,33 @@
         </div>
     </div>
 
-    <div id="modal-orb-info" class="modal">
+        <div id="modal-orb-info" class="modal">
         <div class="modal-content flex flex-col items-center">
             <div id="info-orb-display" class="w-16 h-16 rounded-full mb-6" style="box-shadow: 0 0 40px currentColor; background: currentColor;"></div>
-            <h2 id="info-title" class="lux-header text-3xl mb-4 text-center">Title</h2>
-            <div id="info-content" class="text-sm text-white/80 mb-8 leading-relaxed text-justify font-mono p-4 bg-white/5 rounded-md w-full">Content</div>
+            <input id="info-title-input" type="text" class="lux-header text-xl text-center mb-2" placeholder="Title">
+            <textarea id="info-content-input" placeholder="Content"></textarea>
             
-            <div class="flex w-full justify-between items-center mt-2">
+            <div class="flex w-full justify-between items-center mt-2 gap-2">
                 <button onclick="closeModal('modal-orb-info')" class="text-[11px] font-mono uppercase text-white/40 hover:text-white">Close</button>
-                <button onclick="reviseOrb()" class="btn-void border-[#00F2FF] text-[#00F2FF]">Revise & Restore</button>
+                <button onclick="updateOrbAxiom()" class="btn-void">Update</button>
+                <button onclick="reviseOrb()" class="btn-void border-[#00F2FF] text-[#00F2FF]">Revise</button>
             </div>
+            <button onclick="obliterateOrb()" class="mt-6 text-[11px] font-mono uppercase text-[#FF3131] hover:text-white transition-colors tracking-widest">⚠ Obliterate Wisdom</button>
         </div>
     </div>
 
     <div id="modal-relation-info" class="modal">
-        <div class="modal-content">
-            <h2 id="rel-info-title" class="lux-header text-2xl mb-2 text-center text-white">Bond</h2>
-            <p id="rel-info-nodes" class="text-[11px] text-center font-mono text-[#00F2FF] mb-6 uppercase tracking-widest"></p>
-            <div id="rel-info-content" class="text-sm text-white/80 mb-6 leading-relaxed text-justify font-mono p-4 bg-white/5 rounded-md">Content</div>
-            <div class="flex justify-center mt-2">
-                <button onclick="closeModal('modal-relation-info')" class="btn-void">Close Bond</button>
+        <div class="modal-content flex flex-col items-center">
+            <h2 class="lux-header text-xl mb-2 text-center text-white">Edit Bond</h2>
+            <p id="rel-info-nodes" class="text-[11px] text-center font-mono text-[#00F2FF] mb-4 uppercase tracking-widest"></p>
+            <input id="rel-info-title-input" type="text" placeholder="Bond Name">
+            <textarea id="rel-info-content-input" placeholder="Bond Content"></textarea>
+            
+            <div class="flex w-full justify-between items-center mt-2">
+                <button onclick="closeModal('modal-relation-info')" class="text-[11px] font-mono uppercase text-white/40 hover:text-white">Close</button>
+                <button onclick="updateRelation()" class="btn-void">Update Bond</button>
             </div>
+            <button onclick="obliterateRelation()" class="mt-6 text-[11px] font-mono uppercase text-[#FF3131] hover:text-white transition-colors tracking-widest">⚠ Sever Bond</button>
         </div>
     </div>
 
@@ -261,8 +267,8 @@
         let relations = JSON.parse(localStorage.getItem('mnemonic_relations_v2')) || [];
         
         let linkMode = false; let selectedForLink = null; let targetForLink = null;
-        let activeOrbId = null; let draggedOrb = null;
-
+        let activeOrbId = null; let activeRelationId = null; let draggedOrb = null;
+        
         // Biological Decay Math: Blue (0,242,255) -> Red (255,49,49) over 7 days
         function calculateOrbColor(lastRevised) {
             const decayTimeMs = 7 * 24 * 60 * 60 * 1000; 
@@ -425,26 +431,65 @@
             saveData(); renderWeb(); closeModal('modal-orb-info');
         }
 
+        // Updates the text inside an Orb without resetting its decay
+        function updateOrbAxiom() {
+            const orb = orbs.find(o => o.id === activeOrbId);
+            if (orb) {
+                orb.title = document.getElementById('info-title-input').value;
+                orb.content = document.getElementById('info-content-input').value;
+                saveData(); renderWeb(); closeModal('modal-orb-info');
+            }
+        }
+
+        // Obliterates Orb and automatically severs any attached relations
+        function obliterateOrb() {
+            if (!activeOrbId) return;
+            if (confirm("OBLITERATE THIS WISDOM? ALL RELATED BONDS WILL BE SEVERED.")) {
+                relations = relations.filter(rel => rel.sourceId !== activeOrbId && rel.targetId !== activeOrbId);
+                orbs = orbs.filter(o => o.id !== activeOrbId);
+                saveData(); renderWeb(); closeModal('modal-orb-info');
+            }
+        }
+
+        // Updates text inside a Bond
+        function updateRelation() {
+            const rel = relations.find(r => r.id === activeRelationId);
+            if (rel) {
+                rel.title = document.getElementById('rel-info-title-input').value;
+                rel.content = document.getElementById('rel-info-content-input').value;
+                saveData(); renderWeb(); closeModal('modal-relation-info');
+            }
+        }
+
+        // Severs a specific Bond
+        function obliterateRelation() {
+            if (!activeRelationId) return;
+            if (confirm("SEVER THIS BOND?")) {
+                relations = relations.filter(rel => rel.id !== activeRelationId);
+                saveData(); renderWeb(); closeModal('modal-relation-info');
+            }
+        }
+        
         // --- 6. UI HELPERS ---
         function openModal(id) { const m = document.getElementById(id); m.style.display = 'flex'; setTimeout(() => m.classList.add('active'), 10); }
         function closeModal(id) { const m = document.getElementById(id); m.classList.remove('active'); setTimeout(() => m.style.display = 'none', 300); }
 
         function openOrbInfo(id) {
             activeOrbId = id; const orb = orbs.find(o => o.id === id);
-            document.getElementById('info-title').innerText = orb.title;
-            document.getElementById('info-content').innerText = orb.content;
+            document.getElementById('info-title-input').value = orb.title;
+            document.getElementById('info-content-input').value = orb.content;
             document.getElementById('info-orb-display').style.color = calculateOrbColor(orb.lastRevised);
             openModal('modal-orb-info');
         }
 
         function openRelationInfo(id) {
-            const rel = relations.find(r => r.id === id);
-            document.getElementById('rel-info-title').innerText = rel.title;
+            activeRelationId = id; const rel = relations.find(r => r.id === id);
+            document.getElementById('rel-info-title-input').value = rel.title;
             document.getElementById('rel-info-nodes').innerText = `${orbs.find(o=>o.id==rel.sourceId).title} ↔ ${orbs.find(o=>o.id==rel.targetId).title}`;
-            document.getElementById('rel-info-content').innerText = rel.content;
+            document.getElementById('rel-info-content-input').value = rel.content;
             openModal('modal-relation-info');
         }
-
+        
         renderWeb();
     </script>
 </body>
