@@ -116,12 +116,29 @@
         }
 
         input, textarea {
-            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
-            color: white; padding: 15px; margin-bottom: 20px; outline: none; font-family: 'Inter', sans-serif;
-            border-radius: 6px; transition: border-color 0.3s;
-        }
-        input:focus, textarea:focus { border-color: var(--core-red); background: rgba(255,255,255,0.05); }
-        textarea { height: 140px; resize: none; }
+    width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+    color: white; padding: 15px; margin-bottom: 20px; outline: none; font-family: 'Inter', sans-serif;
+    border-radius: 6px; transition: border-color 0.3s;
+}
+input:focus, textarea:focus { border-color: var(--core-red); background: rgba(255,255,255,0.05); }
+
+/* Upgraded Textarea for Obsidian-like capacity */
+textarea { 
+    min-height: 140px; /* Base height */
+    height: 35vh; /* Responsive height: 35% of the viewport height */
+    max-height: 60vh; /* Prevents it from taking over the entire screen */
+    resize: vertical; /* Allows you to manually drag the bottom to make it larger */
+    overflow-y: auto; /* Adds a scrollbar when content exceeds height */
+}
+
+/* Ensure the modal content box can handle the new height and scroll if necessary */
+.modal-content {
+    background: #050505; border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 35px; border-radius: 12px; box-shadow: 0 30px 60px rgba(0,0,0,1);
+    width: 90%; max-width: 600px; /* Increased max-width for better reading */
+    max-height: 90vh; /* Prevents the modal from going off-screen */
+    overflow-y: auto; /* Allows the entire modal to scroll if the textarea is huge */
+}
         
         .lux-header { font-family: 'Cinzel', serif; letter-spacing: 0.3em; text-transform: uppercase; }
     </style>
