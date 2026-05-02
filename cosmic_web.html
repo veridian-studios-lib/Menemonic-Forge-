@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Cosmic Web | Mnemonic Forge</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=JetBrains+Mono:wght@300&family=Fauna+One&display=swap" rel="stylesheet">
     <style>
         :root { 
             --ember: #FF8C00; 
+            --cyan: #00F2FF;
             --void-bg: #020205; 
-            --sea-bg: rgba(10, 15, 30, 0.9);
             --blue-orb: #3b82f6;
             --red-orb: #ef4444;
         }
@@ -21,36 +21,39 @@
             font-family: 'Fauna One', serif; 
             overflow: hidden; 
             margin: 0;
-            touch-action: none; /* Prevents mobile pull-to-refresh */
+            touch-action: none; /* Critical for custom zoom/pan */
         }
 
-        /* The SVG Canvas for Relation Lines */
+        /* The Star Particle Canvas */
+        #starCanvas {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+        }
+
+        /* THE WORLD SPACE (Holds Orbs & SVG, is transformed by Zoom/Pan) */
+        #world-space {
+            position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 1;
+            transform-origin: 0 0;
+        }
+
+        /* SVG Canvas for Relation Lines */
         #relation-layer {
-            position: fixed; inset: 0; z-index: 1; pointer-events: none;
+            position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: visible;
         }
         .relation-line {
-            pointer-events: auto; /* Make lines clickable */
-            cursor: pointer;
-            stroke: rgba(255, 140, 0, 0.4);
-            stroke-width: 2;
+            pointer-events: auto; cursor: pointer;
+            stroke: rgba(255, 140, 0, 0.4); stroke-width: 2;
             transition: stroke 0.3s, filter 0.3s;
         }
         .relation-line:hover {
-            stroke: rgba(255, 140, 0, 1);
-            filter: drop-shadow(0 0 8px #FF8C00);
-            stroke-width: 4;
+            stroke: rgba(255, 140, 0, 1); filter: drop-shadow(0 0 8px #FF8C00); stroke-width: 4;
         }
 
         /* The Orbs */
-        #orb-layer { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+        #orb-layer { position: absolute; top: 0; left: 0; width: 0; height: 0; }
         
         .orb {
-            position: absolute;
-            width: 30px; height: 30px;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: auto;
-            cursor: grab;
+            position: absolute; width: 30px; height: 30px; border-radius: 50%;
+            transform: translate(-50%, -50%); pointer-events: auto; cursor: grab;
             display: flex; justify-content: center; align-items: center;
             box-shadow: 0 0 20px currentColor, inset 0 0 10px currentColor;
             background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), currentColor);
@@ -59,21 +62,24 @@
         .orb:active { cursor: grabbing; }
         .orb .orb-label {
             position: absolute; top: 35px;
-            font-family: 'JetBrains Mono', monospace; font-size: 9px;
-            white-space: nowrap; opacity: 0.7; pointer-events: none;
-            text-transform: uppercase; letter-spacing: 0.1em; text-shadow: 0 0 5px black;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: bold;
+            white-space: nowrap; opacity: 0.9; pointer-events: none;
+            text-transform: uppercase; letter-spacing: 0.1em; text-shadow: 0 2px 4px black;
         }
 
         /* UI & Zones */
         .ui-layer { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
         .interactive { pointer-events: auto; }
         
+        /* THE SEA (Upgraded Visuals) */
         .sea-zone {
-            height: 25vh; width: 100%;
-            background: linear-gradient(to top, var(--sea-bg), transparent);
-            border-top: 1px dashed rgba(59, 130, 246, 0.3);
-            display: flex; align-items: flex-end; justify-content: center; padding-bottom: 20px;
-            pointer-events: none;
+            height: 22vh; width: 100%;
+            background: linear-gradient(180deg, rgba(5, 15, 30, 0.8) 0%, #010409 100%);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border-top: 2px solid rgba(0, 242, 255, 0.4);
+            box-shadow: 0 -15px 40px rgba(0, 242, 255, 0.1);
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start; 
+            padding-top: 20px; pointer-events: none;
         }
 
         /* Modals */
@@ -87,19 +93,19 @@
         .modal.active { display: flex; opacity: 1; }
         .modal-content {
             background: #0a0a0a; border: 1px solid rgba(255, 140, 0, 0.2);
-            padding: 30px; border-radius: 4px; box-shadow: 0 20px 50px rgba(0,0,0,1);
+            padding: 30px; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,1);
             width: 90%; max-width: 450px; text-align: center;
         }
 
         .btn-forge {
-            background: transparent; border: 1px solid var(--ember); color: var(--ember);
+            background: rgba(0,0,0,0.5); border: 1px solid var(--ember); color: var(--ember);
             padding: 12px 24px; text-transform: uppercase; letter-spacing: 0.2em; font-size: 10px;
             font-family: 'JetBrains Mono', monospace; cursor: pointer; transition: all 0.3s;
         }
-        .btn-forge:hover { background: rgba(255, 140, 0, 0.1); box-shadow: 0 0 15px rgba(255, 140, 0, 0.4); }
+        .btn-forge:hover { background: rgba(255, 140, 0, 0.2); box-shadow: 0 0 15px rgba(255, 140, 0, 0.4); }
 
-        .btn-ascend { border-color: var(--blue-orb); color: var(--blue-orb); }
-        .btn-ascend:hover { background: rgba(59, 130, 246, 0.1); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+        .btn-ascend { border-color: var(--cyan); color: var(--cyan); }
+        .btn-ascend:hover { background: rgba(0, 242, 255, 0.2); box-shadow: 0 0 15px rgba(0, 242, 255, 0.4); }
 
         .mode-toggle { border: 1px solid rgba(255,255,255,0.2); color: white; }
         .mode-toggle.active { border-color: #ef4444; color: #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
@@ -114,33 +120,36 @@
 </head>
 <body>
 
-    <svg id="relation-layer"></svg>
+    <canvas id="starCanvas"></canvas>
 
-    <div id="orb-layer"></div>
+    <div id="world-space">
+        <svg id="relation-layer"></svg>
+        <div id="orb-layer"></div>
+    </div>
 
     <div class="ui-layer">
         <div class="p-6 flex justify-between items-start interactive">
             <button onclick="window.location.href='index.html'" class="text-[#FF8C00] opacity-50 hover:opacity-100 font-mono text-[10px] tracking-widest">// RETURN</button>
             <div class="text-right">
-                <h1 class="text-xl font-bold tracking-[0.4em] uppercase text-[#FF8C00]" style="font-family: 'Cinzel', serif;">The Void</h1>
-                <button id="linkModeBtn" onclick="toggleLinkMode()" class="mt-2 interactive btn-forge mode-toggle text-[8px] py-1 px-2">MODE: MOVE ORBS</button>
+                <h1 class="text-xl font-bold tracking-[0.4em] uppercase text-[#FF8C00]" style="font-family: 'Cinzel', serif; text-shadow: 0 0 15px rgba(255,140,0,0.3);">The Void</h1>
+                <button id="linkModeBtn" onclick="toggleLinkMode()" class="mt-2 interactive btn-forge mode-toggle text-[8px] py-1 px-2">MODE: PAN & MOVE</button>
             </div>
         </div>
 
-        <div class="sea-zone interactive flex-col">
-            <p class="text-[10px] uppercase tracking-[0.4em] opacity-40 mb-4" style="font-family: 'Cinzel', serif;">The Sea of Whispers</p>
-            <button onclick="openModal('modal-add-wisdom')" class="btn-forge">+ Add Wisdom</button>
+        <div class="sea-zone">
+            <p class="text-[10px] uppercase tracking-[0.4em] text-[#00F2FF] opacity-60 mb-4" style="font-family: 'Cinzel', serif;">The Sea of Whispers</p>
+            <button onclick="openModal('modal-add-wisdom')" class="btn-forge interactive border-[#00F2FF] text-[#00F2FF]">+ INSCRIBE SEED</button>
         </div>
     </div>
 
     <div id="modal-add-wisdom" class="modal">
         <div class="modal-content">
-            <h2 class="font-serif text-2xl mb-6 tracking-widest text-[#FF8C00]" style="font-family: 'Cinzel', serif;">The Scriptorium</h2>
+            <h2 class="font-serif text-2xl mb-6 tracking-widest text-[#00F2FF]" style="font-family: 'Cinzel', serif;">The Scriptorium</h2>
             <input id="wisdom-title" type="text" placeholder="TITLE OF SEED">
             <textarea id="wisdom-content" placeholder="Inscribe your knowledge..."></textarea>
             <div class="flex justify-between items-center mt-4">
                 <button onclick="closeModal('modal-add-wisdom')" class="text-[10px] font-mono uppercase opacity-40 hover:opacity-100">Cancel</button>
-                <button onclick="commitWisdom()" class="btn-forge">Commit to Sea</button>
+                <button onclick="commitWisdom()" class="btn-forge border-[#00F2FF] text-[#00F2FF]">Drop in Sea</button>
             </div>
         </div>
     </div>
@@ -167,8 +176,7 @@
             
             <div class="flex w-full justify-between items-center border-t border-white/10 pt-4">
                 <button onclick="closeModal('modal-orb-info')" class="text-[10px] font-mono uppercase opacity-40 hover:opacity-100">Close</button>
-                <div id="info-action-container">
-                    </div>
+                <div id="info-action-container"></div>
             </div>
         </div>
     </div>
@@ -185,26 +193,82 @@
     </div>
 
     <script>
-        // --- 1. STATE & DATA STRUCTURE ---
+        // --- 1. ATMOSPHERICS (STAR PARTICLES) ---
+        const starCanvas = document.getElementById('starCanvas');
+        const starCtx = starCanvas.getContext('2d');
+        let stars = [];
+
+        function initStars() {
+            starCanvas.width = window.innerWidth;
+            starCanvas.height = window.innerHeight;
+            stars = Array(150).fill().map(() => ({
+                x: Math.random() * starCanvas.width,
+                y: Math.random() * starCanvas.height,
+                size: Math.random() * 1.5 + 0.5,
+                speedX: (Math.random() - 0.5) * 0.3,
+                speedY: (Math.random() - 0.5) * 0.3,
+                alpha: Math.random() * 0.8 + 0.2
+            }));
+        }
+
+        function drawStars() {
+            starCtx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+            stars.forEach(s => {
+                s.x += s.speedX; s.y += s.speedY;
+                if (s.x < 0) s.x = starCanvas.width; if (s.x > starCanvas.width) s.x = 0;
+                if (s.y < 0) s.y = starCanvas.height; if (s.y > starCanvas.height) s.y = 0;
+                
+                starCtx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`;
+                starCtx.beginPath();
+                starCtx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+                starCtx.fill();
+            });
+            requestAnimationFrame(drawStars);
+        }
+        initStars(); drawStars();
+        window.addEventListener('resize', initStars);
+
+        // --- 2. CAMERA PHYSICS (PAN & ZOOM) ---
+        let camera = { x: 0, y: 0, z: 1 };
+        const worldSpace = document.getElementById('world-space');
+        let isPanning = false;
+        let lastPanPos = { x: 0, y: 0 };
+        
+        function applyCamera() {
+            worldSpace.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})`;
+        }
+
+        // Mouse Wheel Zoom
+        window.addEventListener('wheel', (e) => {
+            if(e.target.closest('.modal') || e.target.closest('.interactive')) return;
+            const zoomSensitivity = 0.0015;
+            const delta = -e.deltaY * zoomSensitivity;
+            let newZ = Math.min(Math.max(0.3, camera.z + delta), 3); // Min zoom 0.3x, Max 3x
+            
+            // Zoom to cursor logic
+            camera.x = e.clientX - (e.clientX - camera.x) * (newZ / camera.z);
+            camera.y = e.clientY - (e.clientY - camera.y) * (newZ / camera.z);
+            camera.z = newZ;
+            applyCamera();
+        });
+
+        // Touch Pinch-to-Zoom setup
+        let initialPinchDist = null;
+        let initialZoom = 1;
+
+        // --- 3. STATE & DATA STRUCTURE ---
         let orbs = JSON.parse(localStorage.getItem('mnemonic_orbs')) || [];
         let relations = JSON.parse(localStorage.getItem('mnemonic_relations')) || [];
         
-        let linkMode = false; // False = Move, True = Connect
-        let selectedForLink = null;
+        let linkMode = false;
+        let selectedForLink = null; let targetForLink = null;
         let activeOrbId = null;
-        let activeRelationId = null;
-
-        // Interaction States
         let draggedOrb = null;
-        let tempLine = null;
 
-        // --- 2. CORE LOGIC (Color Decay) ---
-        // Blue (59, 130, 246) to Red (239, 68, 68)
         function calculateOrbColor(lastRevised) {
-            const decayTimeMs = 7 * 24 * 60 * 60 * 1000; // 7 Days. Change to 60000 (1 min) for quick testing.
+            const decayTimeMs = 7 * 24 * 60 * 60 * 1000; 
             const elapsed = Date.now() - lastRevised;
             let ratio = Math.min(elapsed / decayTimeMs, 1);
-            
             const r = Math.round(59 + (239 - 59) * ratio);
             const g = Math.round(130 + (68 - 130) * ratio);
             const b = Math.round(246 + (68 - 246) * ratio);
@@ -216,14 +280,11 @@
             localStorage.setItem('mnemonic_relations', JSON.stringify(relations));
         }
 
-        // --- 3. RENDERING ENGINE ---
         function renderWeb() {
             const orbLayer = document.getElementById('orb-layer');
             const svgLayer = document.getElementById('relation-layer');
-            orbLayer.innerHTML = '';
-            svgLayer.innerHTML = '';
+            orbLayer.innerHTML = ''; svgLayer.innerHTML = '';
 
-            // Draw Relations
             relations.forEach(rel => {
                 const orbA = orbs.find(o => o.id === rel.sourceId);
                 const orbB = orbs.find(o => o.id === rel.targetId);
@@ -237,21 +298,18 @@
                 }
             });
 
-            // Draw Orbs
             orbs.forEach(orb => {
                 const el = document.createElement('div');
                 el.classList.add('orb');
                 el.style.left = `${orb.x}px`;
                 el.style.top = `${orb.y}px`;
                 
-                // Color logic: Sea = White/Blue, Void = Decay Color
-                const orbColor = orb.status === 'sea' ? 'var(--blue-orb)' : calculateOrbColor(orb.lastRevised);
+                const orbColor = orb.status === 'sea' ? 'var(--cyan)' : calculateOrbColor(orb.lastRevised);
                 el.style.color = orbColor;
 
-                // Selection Highlight for Link Mode
                 if(selectedForLink === orb.id) {
-                    el.style.border = "2px solid #fff";
-                    el.style.transform = "translate(-50%, -50%) scale(1.2)";
+                    el.style.border = "3px solid #fff";
+                    el.style.transform = "translate(-50%, -50%) scale(1.3)";
                 }
 
                 const label = document.createElement('div');
@@ -259,129 +317,15 @@
                 label.innerText = orb.title;
                 el.appendChild(label);
 
-                // Events
                 el.onpointerdown = (e) => handleOrbPointerDown(e, orb);
                 orbLayer.appendChild(el);
             });
         }
+        setInterval(renderWeb, 60000); 
 
-        // Render Loop for real-time decay updates
-        setInterval(renderWeb, 60000); // Re-render every minute to update decay
-
-        // --- 4. INTERACTION PHYSICS (Drag & Drop / Linking) ---
+        // --- 4. MASTER INPUT HANDLER (Orbs & Camera) ---
         function handleOrbPointerDown(e, orb) {
-            e.stopPropagation();
-            if (linkMode) {
-                if (!selectedForLink) {
-                    selectedForLink = orb.id; // Pick first orb
-                    renderWeb();
-                } else if (selectedForLink !== orb.id) {
-                    // Pick second orb and trigger link Scriptorium
-                    document.getElementById('relation-nodes-text').innerText = 
-                        `Linking: ${orbs.find(o=>o.id==selectedForLink).title} -> ${orb.title}`;
-                    openModal('modal-add-relation');
-                } else {
-                    selectedForLink = null; // Deselect
-                    renderWeb();
-                }
-            } else {
-                // Move Mode
-                draggedOrb = orb;
-            }
-        }
-
-        // Window Pointer Events for Dragging
-        window.addEventListener('pointermove', (e) => {
-            if (draggedOrb) {
-                draggedOrb.x = e.clientX;
-                draggedOrb.y = e.clientY;
-                renderWeb();
-            }
-        });
-
-        window.addEventListener('pointerup', (e) => {
-            if (draggedOrb) {
-                // Check if dragging, or if it was just a click
-                // For simplicity: If we release, save state. 
-                // We open Info page via a separate mechanic or if distance moved is 0.
-                saveData();
-                draggedOrb = null;
-            }
-        });
-
-        // Click detection without dragging
-        let clickStart = {x: 0, y: 0};
-        window.addEventListener('pointerdown', (e) => { clickStart = {x: e.clientX, y: e.clientY}; });
-        window.addEventListener('pointerup', (e) => {
-            if(!draggedOrb && !linkMode) {
-                const dist = Math.hypot(e.clientX - clickStart.x, e.clientY - clickStart.y);
-                if (dist < 5) {
-                    // It was a clean click. Check if it hit an orb.
-                    const target = e.target.closest('.orb');
-                    if (target) {
-                        const title = target.querySelector('.orb-label').innerText;
-                        const orb = orbs.find(o => o.title === title);
-                        if (orb) openOrbInfo(orb.id);
-                    }
-                }
-            }
-        });
-
-        function toggleLinkMode() {
-            linkMode = !linkMode;
-            const btn = document.getElementById('linkModeBtn');
-            btn.classList.toggle('active', linkMode);
-            btn.innerText = linkMode ? "MODE: FORGE LINKS (TAP 2 ORBS)" : "MODE: MOVE ORBS";
-            selectedForLink = null;
-            renderWeb();
-        }
-
-        // --- 5. DATA MUTATIONS (Adding, Ascending, Revising) ---
-        function commitWisdom() {
-            const title = document.getElementById('wisdom-title').value;
-            const content = document.getElementById('wisdom-content').value;
-            if(!title) return;
-
-            // Spawn in the "Sea" (Bottom 20% of screen)
-            const spawnX = window.innerWidth / 2 + (Math.random() * 40 - 20);
-            const spawnY = window.innerHeight - 80 + (Math.random() * 20 - 10);
-
-            orbs.push({
-                id: Date.now().toString(),
-                title: title,
-                content: content,
-                x: spawnX, y: spawnY,
-                status: 'sea',
-                lastRevised: Date.now()
-            });
-
-            document.getElementById('wisdom-title').value = '';
-            document.getElementById('wisdom-content').value = '';
-            saveData(); renderWeb(); closeModal('modal-add-wisdom');
-        }
-
-        function commitRelation() {
-            const title = document.getElementById('relation-title').value;
-            const content = document.getElementById('relation-content').value;
-            if(!title || !selectedForLink) return;
-
-            // Find the orb we hovered/clicked on last (stored in a temp variable, handled by event)
-            // Wait, we need to pass the target orb ID.
-            // Hacky but effective: The target is the orb we clicked second. We didn't store it yet.
-            // Let's modify handleOrbPointerDown to pass it here.
-            // Done.
-            
-            // To fix scoping, selectedForLink is Orb A. We need Orb B.
-            // I'll grab Orb B from the global state I'll create.
-            // Actually, in `handleOrbPointerDown` I called `openModal('modal-add-relation')`.
-            // Let's set a global `targetForLink`.
-        }
-
-        // Proper Link Commit
-        let targetForLink = null;
-        const oldHandle = handleOrbPointerDown;
-        handleOrbPointerDown = function(e, orb) {
-            e.stopPropagation();
+            e.stopPropagation(); // Stops camera from panning
             if (linkMode) {
                 if (!selectedForLink) {
                     selectedForLink = orb.id; renderWeb();
@@ -391,24 +335,119 @@
                         `${orbs.find(o=>o.id==selectedForLink).title} ↔ ${orb.title}`;
                     openModal('modal-add-relation');
                 } else { selectedForLink = null; renderWeb(); }
-            } else { draggedOrb = orb; }
+            } else { 
+                draggedOrb = orb; 
+            }
+        }
+
+        // Global Pointer Down for Camera Pan
+        window.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('.interactive') || e.target.closest('.orb')) return;
+            isPanning = true;
+            lastPanPos = { x: e.clientX, y: e.clientY };
+        });
+
+        // Touch Specifics (Pinch Zoom)
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                isPanning = false; draggedOrb = null; // Kill other inputs
+                initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                initialZoom = camera.z;
+            }
+        });
+
+        // Global Pointer Move (Handles Pan, Drag, and Pinch)
+        window.addEventListener('pointermove', (e) => {
+            if (draggedOrb) {
+                // Adjust movement by camera zoom scale so orb tracks finger perfectly
+                draggedOrb.x += e.movementX / camera.z;
+                draggedOrb.y += e.movementY / camera.z;
+                renderWeb();
+            } else if (isPanning && e.pointerType !== 'touch') { // Touch pan handled separately to avoid pinch conflicts
+                camera.x += (e.clientX - lastPanPos.x);
+                camera.y += (e.clientY - lastPanPos.y);
+                lastPanPos = { x: e.clientX, y: e.clientY };
+                applyCamera();
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2 && initialPinchDist) {
+                const currentDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                const scaleFactor = currentDist / initialPinchDist;
+                camera.z = Math.min(Math.max(0.3, initialZoom * scaleFactor), 3);
+                applyCamera();
+            } else if (e.touches.length === 1 && isPanning) {
+                const touch = e.touches[0];
+                camera.x += (touch.clientX - lastPanPos.x);
+                camera.y += (touch.clientY - lastPanPos.y);
+                lastPanPos = { x: touch.clientX, y: touch.clientY };
+                applyCamera();
+            }
+        });
+
+        // Global Pointer Up
+        let clickStart = {x: 0, y: 0};
+        window.addEventListener('pointerdown', (e) => { clickStart = {x: e.clientX, y: e.clientY}; });
+        
+        window.addEventListener('pointerup', (e) => {
+            if (draggedOrb) { saveData(); draggedOrb = null; }
+            isPanning = false;
+            initialPinchDist = null;
+
+            // Click detection for opening Orbs
+            if(!linkMode) {
+                const dist = Math.hypot(e.clientX - clickStart.x, e.clientY - clickStart.y);
+                if (dist < 5 && e.target.closest('.orb')) {
+                    const title = e.target.closest('.orb').querySelector('.orb-label').innerText;
+                    const orb = orbs.find(o => o.title === title);
+                    if (orb) openOrbInfo(orb.id);
+                }
+            }
+        });
+
+        window.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) initialPinchDist = null;
+            isPanning = false;
+        });
+
+        function toggleLinkMode() {
+            linkMode = !linkMode;
+            const btn = document.getElementById('linkModeBtn');
+            btn.classList.toggle('active', linkMode);
+            btn.innerText = linkMode ? "MODE: FORGE LINKS (TAP 2 ORBS)" : "MODE: PAN & MOVE";
+            selectedForLink = null; renderWeb();
+        }
+
+        // --- 5. DATA MUTATIONS ---
+        function commitWisdom() {
+            const title = document.getElementById('wisdom-title').value;
+            const content = document.getElementById('wisdom-content').value;
+            if(!title) return;
+
+            // Spawn in the center of the current camera view, slightly low to simulate the "Sea"
+            const spawnX = (window.innerWidth / 2 - camera.x) / camera.z;
+            const spawnY = (window.innerHeight * 0.8 - camera.y) / camera.z;
+
+            orbs.push({
+                id: Date.now().toString(), title: title, content: content,
+                x: spawnX, y: spawnY, status: 'sea', lastRevised: Date.now()
+            });
+
+            document.getElementById('wisdom-title').value = ''; document.getElementById('wisdom-content').value = '';
+            saveData(); renderWeb(); closeModal('modal-add-wisdom');
         }
 
         function commitRelation() {
             const title = document.getElementById('relation-title').value;
             const content = document.getElementById('relation-content').value;
-            
             relations.push({
-                id: 'rel-' + Date.now(),
-                sourceId: selectedForLink,
-                targetId: targetForLink,
+                id: 'rel-' + Date.now(), sourceId: selectedForLink, targetId: targetForLink,
                 title: title, content: content
             });
-
             selectedForLink = null; targetForLink = null;
             document.getElementById('relation-title').value = ''; document.getElementById('relation-content').value = '';
-            toggleLinkMode(); // Turn off link mode after success
-            saveData(); renderWeb(); closeModal('modal-add-relation');
+            toggleLinkMode(); saveData(); renderWeb(); closeModal('modal-add-relation');
         }
 
         function ascendOrb() {
@@ -416,40 +455,28 @@
             orb.status = 'void';
             orb.lastRevised = Date.now();
             
-            // Physically move it up into the void
-            orb.y = window.innerHeight * 0.4 + (Math.random() * 50 - 25);
+            // Move up into the visible Void relative to current camera
+            orb.y -= (window.innerHeight * 0.4) / camera.z; 
             
             saveData(); renderWeb(); closeModal('modal-orb-info');
         }
 
         function reviseOrb() {
             const orb = orbs.find(o => o.id === activeOrbId);
-            orb.lastRevised = Date.now(); // Reset decay timer
+            orb.lastRevised = Date.now();
             saveData(); renderWeb(); closeModal('modal-orb-info');
         }
 
-        // --- 6. MODAL HANDLERS ---
-        function openModal(id) { 
-            const m = document.getElementById(id);
-            m.style.display = 'flex';
-            setTimeout(() => m.classList.add('active'), 10);
-        }
-        
-        function closeModal(id) { 
-            const m = document.getElementById(id);
-            m.classList.remove('active');
-          setTimeout(() => m.style.display = 'none', 300);
-        }
+        function openModal(id) { const m = document.getElementById(id); m.style.display = 'flex'; setTimeout(() => m.classList.add('active'), 10); }
+        function closeModal(id) { const m = document.getElementById(id); m.classList.remove('active'); setTimeout(() => m.style.display = 'none', 300); }
 
         function openOrbInfo(id) {
-            activeOrbId = id;
-            const orb = orbs.find(o => o.id === id);
-            
+            activeOrbId = id; const orb = orbs.find(o => o.id === id);
             document.getElementById('info-title').innerText = orb.title;
             document.getElementById('info-content').innerText = orb.content;
             document.getElementById('info-status').innerText = `Location: The ${orb.status}`;
             
-            const color = orb.status === 'sea' ? 'var(--blue-orb)' : calculateOrbColor(orb.lastRevised);
+            const color = orb.status === 'sea' ? 'var(--cyan)' : calculateOrbColor(orb.lastRevised);
             document.getElementById('info-orb-display').style.color = color;
 
             const actionContainer = document.getElementById('info-action-container');
@@ -465,15 +492,14 @@
             const rel = relations.find(r => r.id === id);
             const orbA = orbs.find(o => o.id === rel.sourceId);
             const orbB = orbs.find(o => o.id === rel.targetId);
-            
             document.getElementById('rel-info-title').innerText = rel.title;
             document.getElementById('rel-info-nodes').innerText = `${orbA.title} ↔ ${orbB.title}`;
             document.getElementById('rel-info-content').innerText = rel.content;
-            
             openModal('modal-relation-info');
         }
 
-        // Initialize Web
+        // Initialize Web & Camera
+        applyCamera();
         renderWeb();
     </script>
 </body>
