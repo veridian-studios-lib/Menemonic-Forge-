@@ -154,8 +154,9 @@ textarea {
     </div>
 
     <div class="ui-layer">
-        <div class="flex justify-start interactive">
+        <div class="flex justify-start interactive gap-4 items-center">
             <button onclick="window.location.href='index.html'" class="text-white/30 hover:text-white font-mono text-[10px] tracking-widest transition-colors">&larr; EXIT VOID</button>
+            <button id="backBtn" onclick="ascendVoid()" style="display:none;" class="text-[#00F2FF] hover:text-white font-mono text-[10px] tracking-widest transition-colors shadow-[0_0_10px_rgba(0,242,255,0.2)] px-2 py-1 border border-[#00F2FF]/30 rounded">↑ ASCEND TO SOURCE</button>
         </div>
 
         <div class="cmd-bar interactive">
@@ -195,12 +196,16 @@ textarea {
             <input id="info-title-input" type="text" class="lux-header text-xl text-center mb-2" placeholder="Title">
             <textarea id="info-content-input" placeholder="Content"></textarea>
             
-            <div class="flex w-full justify-between items-center mt-2 gap-2">
+                <div class="flex w-full justify-between items-center mt-2 gap-2">
                 <button onclick="closeModal('modal-orb-info')" class="text-[11px] font-mono uppercase text-white/40 hover:text-white">Close</button>
                 <button onclick="updateOrbAxiom()" class="btn-void">Update</button>
                 <button onclick="reviseOrb()" class="btn-void border-[#00F2FF] text-[#00F2FF]">Revise</button>
             </div>
-            <button onclick="obliterateOrb()" class="mt-6 text-[11px] font-mono uppercase text-[#FF3131] hover:text-white transition-colors tracking-widest">⚠ Obliterate Wisdom</button>
+            
+            <div class="flex w-full justify-between items-center mt-6">
+                <button onclick="obliterateOrb()" class="text-[11px] font-mono uppercase text-[#FF3131] hover:text-white transition-colors tracking-widest">⚠ Obliterate</button>
+                <button onclick="enterSubVoid()" class="btn-void border-[#FF1A1A] text-[#FF1A1A] shadow-[0_0_15px_rgba(255,26,26,0.3)]">DIVE INTO VOID ↴</button>
+            </div>
         </div>
     </div>
 
@@ -285,6 +290,7 @@ textarea {
         
         let linkMode = false; let selectedForLink = null; let targetForLink = null;
         let activeOrbId = null; let activeRelationId = null; let draggedOrb = null;
+let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently inside
         
         // Biological Decay Math: Blue (0,242,255) -> Red (255,49,49) over 7 days
         function calculateOrbColor(lastRevised) {
@@ -303,14 +309,23 @@ textarea {
             localStorage.setItem('mnemonic_relations_v2', JSON.stringify(relations));
         }
 
-        function renderWeb() {
+            function renderWeb() {
             const orbLayer = document.getElementById('orb-layer');
             const svgLayer = document.getElementById('relation-layer');
             orbLayer.innerHTML = ''; svgLayer.innerHTML = '';
 
-            relations.forEach(rel => {
-                const orbA = orbs.find(o => o.id === rel.sourceId);
-                const orbB = orbs.find(o => o.id === rel.targetId);
+            // 1. FRACTAL FILTER: Only get orbs for the current level (supports old data where parentId is undefined)
+            const visibleOrbs = orbs.filter(orb => orb.parentId === currentParentId || (currentParentId === null && !orb.parentId));
+            const visibleOrbIds = new Set(visibleOrbs.map(o => o.id));
+            
+            // 2. Filter relations so we only draw lines between currently visible orbs
+            const visibleRelations = relations.filter(rel => visibleOrbIds.has(rel.sourceId) && visibleOrbIds.has(rel.targetId));
+
+            visibleRelations.forEach(rel => {
+                // Change rel.sourceId searches to look inside visibleOrbs
+                const orbA = visibleOrbs.find(o => o.id === rel.sourceId);
+                const orbB = visibleOrbs.find(o => o.id === rel.targetId);
+    
                 if(orbA && orbB) {
                     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                     line.setAttribute("x1", orbA.x); line.setAttribute("y1", orbA.y);
@@ -321,7 +336,7 @@ textarea {
                 }
             });
 
-            orbs.forEach(orb => {
+                visibleOrbs.forEach(orb => {
                 const el = document.createElement('div');
                 el.classList.add('orb');
                 el.style.left = `${orb.x}px`; el.style.top = `${orb.y}px`;
@@ -426,7 +441,7 @@ textarea {
             const spawnX = (Math.random() * 200) - 100;
             const spawnY = (Math.random() * 200) - 100;
 
-            orbs.push({ id: Date.now().toString(), title: title, content: content, x: spawnX, y: spawnY, lastRevised: Date.now() });
+            orbs.push({ id: Date.now().toString(), title: title, content: content, x: spawnX, y: spawnY, lastRevised: Date.now(), parentId: currentParentId });
 
             document.getElementById('wisdom-title').value = ''; document.getElementById('wisdom-content').value = '';
             saveData(); renderWeb(); closeModal('modal-add-wisdom');
@@ -505,6 +520,38 @@ textarea {
             document.getElementById('rel-info-nodes').innerText = `${orbs.find(o=>o.id==rel.sourceId).title} ↔ ${orbs.find(o=>o.id==rel.targetId).title}`;
             document.getElementById('rel-info-content-input').value = rel.content;
             openModal('modal-relation-info');
+        }
+        // --- 7. FRACTAL NAVIGATION PROTOCOLS ---
+        function enterSubVoid() {
+            if (!activeOrbId) return;
+            currentParentId = activeOrbId; // Set the current room to the orb we just clicked
+            closeModal('modal-orb-info');
+            
+            // Re-center the camera on the Sentient Core
+            camera.x = window.innerWidth / 2;
+            camera.y = window.innerHeight / 2;
+            camera.z = 1;
+            applyCamera();
+            
+            document.getElementById('backBtn').style.display = 'block';
+            renderWeb();
+        }
+
+        function ascendVoid() {
+            if (currentParentId === null) return; // Already at the top
+            
+            // Find the parent of the current void to go up one level
+            const currentOrb = orbs.find(o => o.id === currentParentId);
+            currentParentId = currentOrb && currentOrb.parentId ? currentOrb.parentId : null;
+            
+            // Re-center the camera
+            camera.x = window.innerWidth / 2;
+            camera.y = window.innerHeight / 2;
+            camera.z = 1;
+            applyCamera();
+
+            document.getElementById('backBtn').style.display = currentParentId ? 'block' : 'none';
+            renderWeb();
         }
         
         renderWeb();
