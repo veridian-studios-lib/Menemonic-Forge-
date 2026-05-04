@@ -204,6 +204,76 @@
             background: none; border: none; cursor: pointer; transition: 0.3s;
         }
         .btn-close:hover { color: white; }     
+
+            /* =========================================================
+           NEW INFO PAGE WORKSTATION LAYOUT
+           ========================================================= */
+        .terminal-modal {
+            flex-direction: column; justify-content: flex-start;
+            background: #020202; padding: 0;
+        }
+
+        .terminal-modal .top-bar {
+            width: 100%; height: 70px; display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; border-bottom: 1px solid rgba(0, 242, 255, 0.2);
+            background: #050505; flex-shrink: 0; z-index: 10;
+        }
+
+        .terminal-modal .top-bar-title {
+            background: transparent; border: none; color: #00F2FF; font-family: 'Cinzel', serif;
+            font-size: 18px; text-align: center; width: 40%; outline: none; letter-spacing: 0.1em;
+            border-bottom: 1px solid transparent; transition: 0.3s;
+            margin: 0; padding: 5px;
+        }
+        .terminal-modal .top-bar-title:focus { border-bottom: 1px solid rgba(0, 242, 255, 0.5); }
+
+        .terminal-modal .action-group { display: flex; align-items: center; gap: 12px; }
+
+        .terminal-modal .btn-topbar {
+            background: transparent; border: 1px solid rgba(0, 242, 255, 0.4);
+            color: #00F2FF; padding: 6px 14px; font-family: 'JetBrains Mono', monospace;
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+            cursor: pointer; transition: 0.3s; border-radius: 2px;
+        }
+        .terminal-modal .btn-topbar:hover { background: rgba(0, 242, 255, 0.1); border-color: #00F2FF; }
+        .terminal-modal .btn-revise { border-color: rgba(255, 255, 255, 0.3); color: white; }
+
+        .terminal-modal .menu-btn { color: #00F2FF; font-size: 24px; cursor: pointer; padding: 5px 10px; transition: 0.3s; user-select: none; }
+        .terminal-modal .menu-btn:hover { text-shadow: 0 0 10px #00F2FF; }
+
+        /* THE THREE-DOT MENU */
+        .terminal-modal .action-menu {
+            position: absolute; top: 65px; right: 20px; background: #0A0A0A; 
+            border: 1px solid #00F2FF; width: 220px; border-radius: 4px;
+            display: none; flex-direction: column; z-index: 500;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+        }
+        .terminal-modal .action-menu.active { display: flex; }
+        .terminal-modal .menu-item {
+            padding: 15px 20px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            text-transform: uppercase; color: #E0E0E0; cursor: pointer; transition: 0.2s;
+            letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .terminal-modal .menu-item:hover { background: rgba(0, 242, 255, 0.1); color: #00F2FF; }
+        .terminal-modal .menu-item.danger { color: #FF3131; }
+
+        /* CONTENT STAGE */
+        .terminal-modal .huge-content-stage {
+            flex-grow: 1; width: 100%; display: flex; flex-direction: column;
+            padding: 20px 0; overflow: hidden; align-items: center;
+        }
+        .terminal-modal .relation-context {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #00F2FF;
+            text-align: center; margin-bottom: 15px; opacity: 0.6; letter-spacing: 2px;
+        }
+        .terminal-modal .massive-editor {
+            width: 95%; max-width: 1000px; height: 100%; background: transparent; 
+            border: none; outline: none; color: #CCC; font-family: 'Inter', sans-serif; 
+            font-size: 16px; line-height: 1.8; resize: none; overflow-y: auto; 
+            padding: 20px; scrollbar-width: thin; scrollbar-color: #1a1a1a #050505;
+            margin: 0;
+        }
+        .terminal-modal .massive-editor:focus { background: transparent; border: none; }
     </style>
 </head>
 <body>
@@ -253,41 +323,42 @@
         </div>
     </div>
 
-        <div id="modal-orb-info" class="modal">
-        <div class="modal-content">
-            <div id="info-orb-display" class="orb-display-header"></div>
-            
-            <input id="info-title-input" type="text" class="modal-title-display" placeholder="TITLE">
-            
-            <textarea id="info-content-input" placeholder="Axiomatic data..."></textarea>
-            
-            <div class="modal-btn-row">
-                <button onclick="closeModal('modal-orb-info')" class="btn-close">CLOSE</button>
-                <button onclick="reviseAndUpdateOrb()" class="btn-action">REVISE & RESTORE</button>
+        <div id="modal-orb-info" class="modal terminal-modal">
+        <div class="top-bar">
+            <div class="menu-btn" onclick="closeModal('modal-orb-info')">←</div>
+            <input id="info-title-input" class="top-bar-title" placeholder="ORB_ID">
+            <div class="action-group">
+                <button class="btn-topbar btn-revise" onclick="reviseOrbOnly()">Revise</button>
+                <button class="btn-topbar" onclick="updateOrbAxiom()">Update</button>
+                <div class="menu-btn" onclick="toggleActionMenu('orb-menu', event)">⋮</div>
+                <div id="orb-menu" class="action-menu">
+                    <div class="menu-item" onclick="enterSubVoid()">↴ Dive into Void</div>
+                    <div class="menu-item danger" onclick="obliterateOrb()">⚠ Obliterate</div>
+                </div>
             </div>
-
-            <div class="flex w-full justify-between items-center mt-6 pt-4 border-t border-white/10">
-                <button onclick="obliterateOrb()" class="text-[10px] font-mono uppercase text-[#FF3131] hover:text-white transition-colors tracking-widest">⚠ Obliterate</button>
-                <button onclick="enterSubVoid()" class="text-[10px] font-mono uppercase text-[#FF1A1A] hover:text-white transition-colors tracking-widest">Dive ↴</button>
-            </div>
+        </div>
+        <div class="huge-content-stage">
+            <textarea id="info-content-input" class="massive-editor" placeholder="Inscribe axiomatic data..."></textarea>
         </div>
     </div>
 
-    <div id="modal-relation-info" class="modal">
-        <div class="modal-content">
-            <input id="rel-info-title-input" type="text" class="modal-title-display" placeholder="BOND TITLE">
-            
-            <p id="rel-info-nodes" class="text-[12px] text-center font-mono text-[#00F2FF] mb-6 uppercase tracking-widest"></p>
-            
-            <textarea id="rel-info-content-input" placeholder="Bond content..."></textarea>
-            
-            <div class="modal-btn-row" style="justify-content: center;">
-                <button onclick="updateRelation()" class="btn-action" style="border-color: rgba(255,255,255,0.2); color: white;">CLOSE BOND</button>
+    <div id="modal-relation-info" class="modal terminal-modal">
+        <div class="top-bar">
+            <div class="menu-btn" onclick="closeModal('modal-relation-info')">←</div>
+            <input id="rel-info-title-input" class="top-bar-title" placeholder="BOND_ID">
+            <div class="action-group">
+                <button class="btn-topbar" onclick="updateRelation()">Update</button>
+                <div class="menu-btn" onclick="toggleActionMenu('rel-menu', event)">⋮</div>
+                <div id="rel-menu" class="action-menu">
+                    <div class="menu-item danger" onclick="obliterateRelation()">⚠ Sever Bond</div>
+                </div>
             </div>
-             <button onclick="obliterateRelation()" class="mt-6 text-[10px] font-mono uppercase text-[#FF3131] hover:text-white transition-colors tracking-widest">⚠ Sever</button>
+        </div>
+        <div class="huge-content-stage">
+            <div id="rel-info-nodes" class="relation-context">SOURCE ↔ TARGET</div>
+            <textarea id="rel-info-content-input" class="massive-editor" placeholder="Define the systemic link..."></textarea>
         </div>
     </div>
-    
 
     <script>
         // --- 1. THREE.JS ATMOSPHERIC ENGINE ---
@@ -522,35 +593,24 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             toggleLinkMode(); saveData(); renderWeb(); closeModal('modal-add-relation');
         }
 
-        function reviseOrb() {
+            // REVISE ONLY: Resets the decay timer (Turns it Blue) and saves
+        function reviseOrbOnly() {
             const orb = orbs.find(o => o.id === activeOrbId);
-            orb.lastRevised = Date.now(); // Restores frequency to pure blue
-            saveData(); renderWeb(); closeModal('modal-orb-info');
+            if (orb) {
+                orb.title = document.getElementById('info-title-input').value;
+                orb.content = document.getElementById('info-content-input').value;
+                orb.lastRevised = Date.now();
+                saveData(); renderWeb(); closeModal('modal-orb-info');
+            }
         }
 
-        // Updates the text inside an Orb without resetting its decay
+        // UPDATE ONLY: Saves text content without resetting the decay timer
         function updateOrbAxiom() {
             const orb = orbs.find(o => o.id === activeOrbId);
             if (orb) {
                 orb.title = document.getElementById('info-title-input').value;
                 orb.content = document.getElementById('info-content-input').value;
                 saveData(); renderWeb(); closeModal('modal-orb-info');
-            }
-        }
-
-            // Combined function for the new UI button
-        function reviseAndUpdateOrb() {
-            const orb = orbs.find(o => o.id === activeOrbId);
-            if (orb) {
-                // Update Text
-                orb.title = document.getElementById('info-title-input').value;
-                orb.content = document.getElementById('info-content-input').value;
-                // Revise Decay
-                orb.lastRevised = Date.now(); 
-                
-                saveData(); 
-                renderWeb(); 
-                closeModal('modal-orb-info');
             }
         }
         
@@ -634,6 +694,26 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             document.getElementById('backBtn').style.display = currentParentId ? 'block' : 'none';
             renderWeb();
         }
+
+            // --- 8. MENU HELPERS ---
+        function toggleActionMenu(id, e) {
+            if(e) e.stopPropagation();
+            const menu = document.getElementById(id);
+            const wasActive = menu.classList.contains('active');
+            
+            // Close all menus first
+            document.querySelectorAll('.action-menu').forEach(m => m.classList.remove('active'));
+            
+            // If it wasn't active, open it
+            if (!wasActive) menu.classList.add('active');
+        }
+
+        // Close menus when clicking anywhere else on the screen
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.menu-btn') && !e.target.closest('.action-menu')) {
+                document.querySelectorAll('.action-menu').forEach(m => m.classList.remove('active'));
+            }
+        });
         
         renderWeb();
     </script>
