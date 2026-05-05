@@ -326,6 +326,9 @@
         <div id="modal-orb-info" class="modal terminal-modal">
         <div class="top-bar">
             <div class="menu-btn" onclick="closeModal('modal-orb-info')">←</div>
+            
+            <div id="info-orb-display" style="width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 10px currentColor;"></div>
+            
             <input id="info-title-input" class="top-bar-title" placeholder="ORB_ID">
             <div class="action-group">
                 <button class="btn-topbar btn-revise" onclick="reviseOrbOnly()">Revise</button>
@@ -340,8 +343,8 @@
         <div class="huge-content-stage">
             <textarea id="info-content-input" class="massive-editor" placeholder="Inscribe axiomatic data..."></textarea>
         </div>
-    </div>
-
+        </div>
+    
     <div id="modal-relation-info" class="modal terminal-modal">
         <div class="top-bar">
             <div class="menu-btn" onclick="closeModal('modal-relation-info')">←</div>
