@@ -274,6 +274,24 @@
             margin: 0;
         }
         .terminal-modal .massive-editor:focus { background: transparent; border: none; }
+        /* =========================================================
+           CROSS-REALM ASTRAL PROJECTION STYLES
+           ========================================================= */
+        .orb.ghost {
+            opacity: 0.35;
+            border: 1px dashed #00F2FF;
+            box-shadow: none;
+            filter: grayscale(60%);
+            z-index: 1; /* Sits slightly behind normal solid orbs */
+        }
+        .orb.ghost .orb-label { 
+            opacity: 0.6; 
+            color: #00F2FF; 
+        }
+        .relation-line.ghost-line { 
+            stroke-dasharray: 6, 4; 
+            stroke: rgba(0, 242, 255, 0.4); 
+        }      
     </style>
 </head>
 <body>
@@ -448,34 +466,80 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             localStorage.setItem('mnemonic_relations_v2', JSON.stringify(relations));
         }
 
-            function renderWeb() {
+        function renderWeb() {
             const orbLayer = document.getElementById('orb-layer');
             const svgLayer = document.getElementById('relation-layer');
             orbLayer.innerHTML = ''; svgLayer.innerHTML = '';
 
-            // 1. FRACTAL FILTER: Only get orbs for the current level (supports old data where parentId is undefined)
+            // 1. Gather local spatial markers
             const visibleOrbs = orbs.filter(orb => orb.parentId === currentParentId || (currentParentId === null && !orb.parentId));
-            const visibleOrbIds = new Set(visibleOrbs.map(o => o.id));
             
-            // 2. Filter relations so we only draw lines between currently visible orbs
-            const visibleRelations = relations.filter(rel => visibleOrbIds.has(rel.sourceId) && visibleOrbIds.has(rel.targetId));
+            // Sub-routine: SVG Path Matrix Generator
+            function drawLine(sourceX, sourceY, targetX, targetY, relId, isGhost = false) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", sourceX); line.setAttribute("y1", sourceY);
+                line.setAttribute("x2", targetX); line.setAttribute("y2", targetY);
+                line.classList.add("relation-line");
+                if (isGhost) line.classList.add("ghost-line");
+                line.onclick = () => openRelationInfo(relId);
+                svgLayer.appendChild(line);
+            }
 
-            visibleRelations.forEach(rel => {
-                // Change rel.sourceId searches to look inside visibleOrbs
-                const orbA = visibleOrbs.find(o => o.id === rel.sourceId);
-                const orbB = visibleOrbs.find(o => o.id === rel.targetId);
-    
-                if(orbA && orbB) {
-                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                    line.setAttribute("x1", orbA.x); line.setAttribute("y1", orbA.y);
-                    line.setAttribute("x2", orbB.x); line.setAttribute("y2", orbB.y);
-                    line.classList.add("relation-line");
-                    line.onclick = () => openRelationInfo(rel.id);
-                    svgLayer.appendChild(line);
+            // Sub-routine: Ghost Projection Catalyst
+            function spawnGhost(ghostData, anchorOrb) {
+                const el = document.createElement('div');
+                el.classList.add('orb', 'ghost');
+                
+                // Offsets ghost projection relative to anchor node position
+                const ghostX = anchorOrb.x + 90;
+                const ghostY = anchorOrb.y - 90;
+                el.style.left = `${ghostX}px`; el.style.top = `${ghostY}px`;
+                
+                const label = document.createElement('div');
+                label.classList.add('orb-label');
+                label.innerText = ` things ➔ ${ghostData.title}`;
+                el.appendChild(label);
+
+                // Cosmic Warp Navigation: Jump directly back to home domain
+                el.ondblclick = () => {
+                    currentParentId = ghostData.parentId === undefined ? null : ghostData.parentId;
+                    camera.x = window.innerWidth / 2; camera.y = window.innerHeight / 2; camera.z = 1;
+                    applyCamera();
+                    document.getElementById('backBtn').style.display = currentParentId ? 'block' : 'none';
+                    renderWeb();
+                };
+
+                orbLayer.appendChild(el);
+                return { x: ghostX, y: ghostY };
+            }
+
+            // 2. DIMENSIONAL TETHER DISCOVERY SCAN
+            relations.forEach(rel => {
+                const orbA = orbs.find(o => o.id === rel.sourceId);
+                const orbB = orbs.find(o => o.id === rel.targetId);
+                if (!orbA || !orbB) return;
+
+                const isAVisible = (orbA.parentId === currentParentId || (currentParentId === null && !orbA.parentId));
+                const isBVisible = (orbB.parentId === currentParentId || (currentParentId === null && !orbB.parentId));
+
+                // Context A: Core Convergence (Both elements co-exist inside room)
+                if (isAVisible && isBVisible) {
+                    drawLine(orbA.x, orbA.y, orbB.x, orbB.y, rel.id);
+                } 
+                // Context B: External Departure (Source node local, target node in hyperspace)
+                else if (isAVisible && !isBVisible) {
+                    const ghostPos = spawnGhost(orbB, orbA);
+                    drawLine(orbA.x, orbA.y, ghostPos.x, ghostPos.y, rel.id, true);
+                }
+                // Context C: External Arrival (Target node local, source node in hyperspace)
+                else if (!isAVisible && isBVisible) {
+                    const ghostPos = spawnGhost(orbA, orbB);
+                    drawLine(orbB.x, orbB.y, ghostPos.x, ghostPos.y, rel.id, true);
                 }
             });
 
-                visibleOrbs.forEach(orb => {
+            // 3. Render Normal Core Geometry
+            visibleOrbs.forEach(orb => {
                 const el = document.createElement('div');
                 el.classList.add('orb');
                 el.style.left = `${orb.x}px`; el.style.top = `${orb.y}px`;
@@ -493,34 +557,56 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
                 orbLayer.appendChild(el);
             });
         }
+        
         setInterval(renderWeb, 60000); // 1 min update
 
         // --- 4. SOVEREIGN COMMANDS (Double Tap & Drag) ---
         let lastTapTime = 0; let tapDist = 0; let initialTapPos = {x:0, y:0};
+        let tapTimeout = null; // Smart latch to divide singular and composite interactions
 
         function handleOrbPointerDown(e, orb) {
             e.stopPropagation();
             initialTapPos = {x: e.clientX, y: e.clientY};
-            if (linkMode) {
-                if (!selectedForLink) {
-                    selectedForLink = orb.id; renderWeb();
-                } else if (selectedForLink !== orb.id) {
-                    targetForLink = orb.id;
-                    document.getElementById('relation-nodes-text').innerText = `${orbs.find(o=>o.id==selectedForLink).title} ↔ ${orb.title}`;
-                    openModal('modal-add-relation');
-                } else { selectedForLink = null; renderWeb(); }
-            } else { draggedOrb = orb; }
+            draggedOrb = orb; // Dragging is preserved across all active modes
         }
 
         function handleOrbPointerUp(e, orb) {
-            if(linkMode) return;
+            if (!draggedOrb) return;
             const dist = Math.hypot(e.clientX - initialTapPos.x, e.clientY - initialTapPos.y);
             const now = Date.now();
             
-            // Double Tap Logic (if not dragged)
+            // Validate that the pointer state represents a clean click/tap event
             if(dist < 10) {
-                if(now - lastTapTime < 350) { openOrbInfo(orb.id); lastTapTime = 0; } 
-                else { lastTapTime = now; }
+                if(now - lastTapTime < 300) { 
+                    // =========================================================
+                    // GESTURE A: INSTANT WORMHOLE DIVE (Bypasses Link Modes)
+                    // =========================================================
+                    clearTimeout(tapTimeout); 
+                    lastTapTime = 0; 
+                    activeOrbId = orb.id; 
+                    enterSubVoid(); 
+                } 
+                else { 
+                    // =========================================================
+                    // GESTURE B: STRUCTURAL SELECTION / INTERROGATION
+                    // =========================================================
+                    lastTapTime = now; 
+                    tapTimeout = setTimeout(() => {
+                        if (linkMode) {
+                            if (!selectedForLink) {
+                                selectedForLink = orb.id; renderWeb();
+                            } else if (selectedForLink !== orb.id) {
+                                targetForLink = orb.id;
+                                document.getElementById('relation-nodes-text').innerText = `${orbs.find(o=>o.id==selectedForLink).title} ↔ ${orb.title}`;
+                                openModal('modal-add-relation');
+                            } else { 
+                                selectedForLink = null; renderWeb(); 
+                            }
+                        } else {
+                            openOrbInfo(orb.id); 
+                        }
+                    }, 280); // Latch window perfectly tuned for fast mobile environments
+                }
             }
         }
 
