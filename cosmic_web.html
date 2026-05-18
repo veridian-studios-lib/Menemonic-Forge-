@@ -477,13 +477,32 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             const ghostRegistryCounts = {};
 
             function drawLine(sourceX, sourceY, targetX, targetY, relId, isGhost = false) {
-                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                line.setAttribute("x1", sourceX); line.setAttribute("y1", sourceY);
-                line.setAttribute("x2", targetX); line.setAttribute("y2", targetY);
-                line.classList.add("relation-line");
-                if (isGhost) line.classList.add("ghost-line");
-                line.onclick = (e) => { e.stopPropagation(); openRelationInfo(relId); };
-                svgLayer.appendChild(line);
+                // 1. The Visible Line (Thin and styling)
+                const visualLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                visualLine.setAttribute("x1", sourceX); visualLine.setAttribute("y1", sourceY);
+                visualLine.setAttribute("x2", targetX); visualLine.setAttribute("y2", targetY);
+                visualLine.classList.add("relation-line");
+                if (isGhost) visualLine.classList.add("ghost-line");
+                visualLine.style.pointerEvents = "none"; // Let clicks pass through to the hit line
+
+                // 2. The Invisible Hitbox (Thick for easy tapping)
+                const hitLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                hitLine.setAttribute("x1", sourceX); hitLine.setAttribute("y1", sourceY);
+                hitLine.setAttribute("x2", targetX); hitLine.setAttribute("y2", targetY);
+                hitLine.style.strokeWidth = "35"; // Massive 35-pixel tap area
+                hitLine.style.stroke = "transparent"; // Completely invisible
+                hitLine.style.cursor = "pointer";
+                hitLine.style.pointerEvents = "stroke"; // Only registers clicks on the stroke
+
+                // Attach the click event to the massive invisible line instead
+                hitLine.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    openRelationInfo(relId); 
+                };
+
+                // Append both to the SVG layer
+                svgLayer.appendChild(visualLine);
+                svgLayer.appendChild(hitLine);
             }
 
             function spawnGhost(ghostData, anchorOrb, relId) {
