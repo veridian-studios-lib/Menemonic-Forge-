@@ -471,28 +471,36 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             const svgLayer = document.getElementById('relation-layer');
             orbLayer.innerHTML = ''; svgLayer.innerHTML = '';
 
-            // 1. Gather local spatial markers
             const visibleOrbs = orbs.filter(orb => orb.parentId === currentParentId || (currentParentId === null && !orb.parentId));
             
-            // Sub-routine: SVG Path Matrix Generator
+            // Track ghost counts per anchor to calculate orbital offsets dynamically
+            const ghostRegistryCounts = {};
+
             function drawLine(sourceX, sourceY, targetX, targetY, relId, isGhost = false) {
                 const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
                 line.setAttribute("x1", sourceX); line.setAttribute("y1", sourceY);
                 line.setAttribute("x2", targetX); line.setAttribute("y2", targetY);
                 line.classList.add("relation-line");
                 if (isGhost) line.classList.add("ghost-line");
-                line.onclick = () => openRelationInfo(relId);
+                line.onclick = (e) => { e.stopPropagation(); openRelationInfo(relId); };
                 svgLayer.appendChild(line);
             }
 
-            // Sub-routine: Ghost Projection Catalyst
-            function spawnGhost(ghostData, anchorOrb) {
+            function spawnGhost(ghostData, anchorOrb, relId) {
+                if (!ghostRegistryCounts[anchorOrb.id]) ghostRegistryCounts[anchorOrb.id] = 0;
+                const index = ghostRegistryCounts[anchorOrb.id]++;
+                
+                // Orbital Math: Distribute ghosts radially every 45 degrees starting at top-right
+                const baseAngle = -Math.PI / 4; 
+                const angleOffset = index * (Math.PI / 4); 
+                const angle = baseAngle + angleOffset;
+                const radius = 110; // Comfortable distance from the local orb
+                
+                const ghostX = anchorOrb.x + radius * Math.cos(angle);
+                const ghostY = anchorOrb.y + radius * Math.sin(angle);
+                
                 const el = document.createElement('div');
                 el.classList.add('orb', 'ghost');
-                
-                // Offsets ghost projection relative to anchor node position
-                const ghostX = anchorOrb.x + 90;
-                const ghostY = anchorOrb.y - 90;
                 el.style.left = `${ghostX}px`; el.style.top = `${ghostY}px`;
                 
                 const label = document.createElement('div');
@@ -500,8 +508,8 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
                 label.innerText = ` things ➔ ${ghostData.title}`;
                 el.appendChild(label);
 
-                // Cosmic Warp Navigation: Jump directly back to home domain
-                el.ondblclick = () => {
+                el.ondblclick = (e) => {
+                    e.stopPropagation();
                     currentParentId = ghostData.parentId === undefined ? null : ghostData.parentId;
                     camera.x = window.innerWidth / 2; camera.y = window.innerHeight / 2; camera.z = 1;
                     applyCamera();
@@ -513,7 +521,7 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
                 return { x: ghostX, y: ghostY };
             }
 
-            // 2. DIMENSIONAL TETHER DISCOVERY SCAN
+            // 1. SCAN AND DRAW DISTRIBUTED TETHERS
             relations.forEach(rel => {
                 const orbA = orbs.find(o => o.id === rel.sourceId);
                 const orbB = orbs.find(o => o.id === rel.targetId);
@@ -522,23 +530,20 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
                 const isAVisible = (orbA.parentId === currentParentId || (currentParentId === null && !orbA.parentId));
                 const isBVisible = (orbB.parentId === currentParentId || (currentParentId === null && !orbB.parentId));
 
-                // Context A: Core Convergence (Both elements co-exist inside room)
                 if (isAVisible && isBVisible) {
                     drawLine(orbA.x, orbA.y, orbB.x, orbB.y, rel.id);
                 } 
-                // Context B: External Departure (Source node local, target node in hyperspace)
                 else if (isAVisible && !isBVisible) {
-                    const ghostPos = spawnGhost(orbB, orbA);
+                    const ghostPos = spawnGhost(orbB, orbA, rel.id);
                     drawLine(orbA.x, orbA.y, ghostPos.x, ghostPos.y, rel.id, true);
                 }
-                // Context C: External Arrival (Target node local, source node in hyperspace)
                 else if (!isAVisible && isBVisible) {
-                    const ghostPos = spawnGhost(orbA, orbB);
+                    const ghostPos = spawnGhost(orbA, orbB, rel.id);
                     drawLine(orbB.x, orbB.y, ghostPos.x, ghostPos.y, rel.id, true);
                 }
             });
 
-            // 3. Render Normal Core Geometry
+            // 2. RENDER STABLE PHYSICAL ORBS
             visibleOrbs.forEach(orb => {
                 const el = document.createElement('div');
                 el.classList.add('orb');
@@ -562,34 +567,29 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
 
         // --- 4. SOVEREIGN COMMANDS (Double Tap & Drag) ---
         let lastTapTime = 0; let tapDist = 0; let initialTapPos = {x:0, y:0};
-        let tapTimeout = null; // Smart latch to divide singular and composite interactions
+        let tapTimeout = null;
 
         function handleOrbPointerDown(e, orb) {
             e.stopPropagation();
             initialTapPos = {x: e.clientX, y: e.clientY};
-            draggedOrb = orb; // Dragging is preserved across all active modes
+            draggedOrb = orb; // Latch target node for manual positioning
         }
 
         function handleOrbPointerUp(e, orb) {
-            if (!draggedOrb) return;
             const dist = Math.hypot(e.clientX - initialTapPos.x, e.clientY - initialTapPos.y);
             const now = Date.now();
             
-            // Validate that the pointer state represents a clean click/tap event
+            // Clean Click/Tap Detection (Ignores drags)
             if(dist < 10) {
                 if(now - lastTapTime < 300) { 
-                    // =========================================================
-                    // GESTURE A: INSTANT WORMHOLE DIVE (Bypasses Link Modes)
-                    // =========================================================
+                    // GESTURE A: WORMHOLE DIVE
                     clearTimeout(tapTimeout); 
                     lastTapTime = 0; 
                     activeOrbId = orb.id; 
                     enterSubVoid(); 
                 } 
                 else { 
-                    // =========================================================
-                    // GESTURE B: STRUCTURAL SELECTION / INTERROGATION
-                    // =========================================================
+                    // GESTURE B: SELECTION / INTERROGATION
                     lastTapTime = now; 
                     tapTimeout = setTimeout(() => {
                         if (linkMode) {
@@ -605,7 +605,7 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
                         } else {
                             openOrbInfo(orb.id); 
                         }
-                    }, 280); // Latch window perfectly tuned for fast mobile environments
+                    }, 250); // Tuned for rapid response times
                 }
             }
         }
