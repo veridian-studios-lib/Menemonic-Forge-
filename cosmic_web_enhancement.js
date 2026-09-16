@@ -209,19 +209,39 @@
             </div>
         `;
 
-        // POINTER INTERCEPT: Hijack before mobile keyboard dismissal drops the event
-        card.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            foldToOrb(orb);
+        // POINTER INTERCEPT: Double-Tap mechanic to prevent scroll conflicts
+        let lastTap = 0;
+        card.addEventListener('pointerup', (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            
+            if (tapLength < 500 && tapLength > 0) {
+                // DOUBLE TAP DETECTED - Execute spatial fold
+                e.preventDefault();
+                e.stopPropagation();
+                foldToOrb(orb);
+            } else {
+                // SINGLE TAP - Visually lock target, allow scroll to continue safely
+                // Reset all other cards to default styling first
+                document.querySelectorAll('.search-result-card').forEach(c => {
+                    c.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                    c.style.background = 'rgba(255, 255, 255, 0.02)';
+                });
+                // Highlight the currently tapped card
+                card.style.borderColor = 'rgba(0, 242, 255, 0.8)';
+                card.style.background = 'rgba(0, 242, 255, 0.15)';
+            }
+            lastTap = currentTime;
         });
 
         list.appendChild(card);
-    }
+    } // End of renderResultCard function
 
+    
     // ==========================================
     // 4. SPATIAL FOLDING & CAMERA SNAP
     // ==========================================
+
     function foldToOrb(targetOrb) {
         closeSearchHUD();
 
@@ -247,44 +267,33 @@
             renderWeb();
         }
 
-        // 3. 150ms Buffer allows mobile keyboard collapse to settle viewport dimensions
+        // 3. Buffer allows mobile keyboard collapse to settle viewport dimensions
         setTimeout(() => {
             const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : null);
+            
+            // INSTANT TELEPORTATION FIX: Directly assign orb coordinates to the camera
             if (activeCamera && typeof targetOrb.x === 'number' && typeof targetOrb.y === 'number') {
-                const scale = activeCamera.z || 1;
-                const targetX = (window.innerWidth / 2) - (targetOrb.x * scale);
-                const targetY = (window.innerHeight / 2) - (targetOrb.y * scale);
-
-                let frame = 0;
-                const startX = activeCamera.x;
-                const startY = activeCamera.y;
-
-                function animateFold() {
-                    frame++;
-                    const ease = 1 - Math.pow(1 - (frame / 25), 3);
-                    activeCamera.x = startX + (targetX - startX) * ease;
-                    activeCamera.y = startY + (targetY - startY) * ease;
-                    
-                    if (typeof window.applyCamera === 'function') {
-                        window.applyCamera();
-                    } else if (typeof applyCamera === 'function') {
-                        applyCamera();
-                    }
-                    
-                    if (frame < 25) requestAnimationFrame(animateFold);
+                // By directly equating camera coordinates to orb coordinates, the canvas perfectly centers it
+                activeCamera.x = targetOrb.x;
+                activeCamera.y = targetOrb.y;
+                
+                // Force the engine to apply the new camera state instantly
+                if (typeof window.applyCamera === 'function') {
+                    window.applyCamera();
+                } else if (typeof applyCamera === 'function') {
+                    applyCamera();
                 }
-                animateFold();
             }
 
-            // 4. Open orb details modal
+            // 4. Open orb details modal precisely after the snap
             if (typeof window.openOrbInfo === 'function') {
                 window.openOrbInfo(targetOrb.id);
             } else if (typeof openOrbInfo === 'function') {
                 openOrbInfo(targetOrb.id);
             }
-        }, 150);
+        }, 150); // 150ms buffer ensures screen layout is settled before snapping
     }
-
+    
     // ==========================================
     // 5. TRIGGERS & HARDWARE TOUCH SHIELD
     // ==========================================
