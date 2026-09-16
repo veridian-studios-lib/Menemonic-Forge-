@@ -245,39 +245,41 @@
     function foldToOrb(targetOrb) {
         closeSearchHUD();
 
-        // 1. Update sub-void level across scopes
+        // 1. Update Sub-Void Spatial Context
+        const targetParent = targetOrb.parentId || null;
         if (typeof window.setCurrentParentId === 'function') {
-            window.setCurrentParentId(targetOrb.parentId || null);
+            window.setCurrentParentId(targetParent);
         } else {
-            window.currentParentId = targetOrb.parentId || null;
+            window.currentParentId = targetParent;
         }
 
         const backBtn = document.getElementById('backBtn');
         if (backBtn) {
-            const parentVal = typeof window.getCurrentParentId === 'function' 
+            const currentParent = typeof window.getCurrentParentId === 'function' 
                 ? window.getCurrentParentId() 
                 : window.currentParentId;
-            backBtn.style.display = parentVal ? 'block' : 'none';
+            backBtn.style.display = currentParent ? 'block' : 'none';
         }
 
-        // 2. Re-render web for target context
+        // 2. Re-render Visual Web State
         if (typeof window.renderWeb === 'function') {
             window.renderWeb();
         } else if (typeof renderWeb === 'function') {
             renderWeb();
         }
 
-        // 3. Buffer allows mobile keyboard collapse to settle viewport dimensions
+        // 3. Viewport Stabilization Buffer (200ms for total mobile layout settlement)
         setTimeout(() => {
             const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : null);
             
-            // INSTANT TELEPORTATION FIX: Directly assign orb coordinates to the camera
             if (activeCamera && typeof targetOrb.x === 'number' && typeof targetOrb.y === 'number') {
-                // By directly equating camera coordinates to orb coordinates, the canvas perfectly centers it
-                activeCamera.x = targetOrb.x;
-                activeCamera.y = targetOrb.y;
+                const scale = activeCamera.z || 1;
                 
-                // Force the engine to apply the new camera state instantly
+                // RESTORED NATIVE TRANSLATION MATH: Centers the node based on true viewport dimensions
+                activeCamera.x = (window.innerWidth / 2) - (targetOrb.x * scale);
+                activeCamera.y = (window.innerHeight / 2) - (targetOrb.y * scale);
+                
+                // Commit spatial fold to the engine
                 if (typeof window.applyCamera === 'function') {
                     window.applyCamera();
                 } else if (typeof applyCamera === 'function') {
@@ -285,14 +287,15 @@
                 }
             }
 
-            // 4. Open orb details modal precisely after the snap
+            // 4. Trigger the Perceptual Architect / Open Info Box
             if (typeof window.openOrbInfo === 'function') {
                 window.openOrbInfo(targetOrb.id);
             } else if (typeof openOrbInfo === 'function') {
                 openOrbInfo(targetOrb.id);
             }
-        }, 150); // 150ms buffer ensures screen layout is settled before snapping
+        }, 200); 
     }
+    
     
     // ==========================================
     // 5. TRIGGERS & HARDWARE TOUCH SHIELD
