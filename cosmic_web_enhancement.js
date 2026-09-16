@@ -243,7 +243,7 @@
     // ==========================================
 
     function foldToOrb(targetOrb) {
-        // OMNI-DIRECTOR SAFEGUARD: Prevent void collapse if no target is passed
+        // OMNI-DIRECTOR SAFEGUARD
         if (!targetOrb) return; 
         
         closeSearchHUD();
@@ -264,39 +264,31 @@
             backBtn.style.display = currentParent ? 'block' : 'none';
         }
 
-        // 2. Re-render Visual Web State (Destroys old canvas node references)
+        // 2. Trigger the Engine's Visual Re-render
         if (typeof window.renderWeb === 'function') {
             window.renderWeb();
         } else if (typeof renderWeb === 'function') {
             renderWeb();
         }
 
-        // 3. Viewport Stabilization & Live Tracking Buffer
-        setTimeout(() => {
+        // 3. The Omni-Seeker Protocol (Active Tracking Loop)
+        // Tracks the target node for 2 seconds while kinetic physics settle
+        let trackingFrames = 0;
+        const maxFrames = 120; // Approx 2 seconds at 60fps
+        
+        function trackTargetNode() {
+            trackingFrames++;
             const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : null);
-            
-            if (activeCamera) {
-                // Fetch the 'live' rendered orb to prevent ghost references
-                const liveOrbs = typeof getGlobalOrbs === 'function' ? getGlobalOrbs() : [];
-                const liveTarget = liveOrbs.find(o => o.id === targetOrb.id) || targetOrb;
-                const scale = activeCamera.z || 1;
+            const liveOrbs = typeof getGlobalOrbs === 'function' ? getGlobalOrbs() : (window.orbs || []);
+            const liveTarget = liveOrbs.find(o => o.id === targetOrb.id);
 
-                // STRICT VALIDATION: Ensure coordinates exist, are numbers, and are NOT 'NaN'
-                if (liveTarget && 
-                    typeof liveTarget.x === 'number' && !isNaN(liveTarget.x) && 
-                    typeof liveTarget.y === 'number' && !isNaN(liveTarget.y)) {
-                    
-                    // Coordinates found: Snap directly to the calculated node
-                    activeCamera.x = (window.innerWidth / 2) - (liveTarget.x * scale);
-                    activeCamera.y = (window.innerHeight / 2) - (liveTarget.y * scale);
-                } else {
-                    // SPATIAL FALLBACK: Center the camera on the void's origin
-                    activeCamera.x = window.innerWidth / 2;
-                    activeCamera.y = window.innerHeight / 2;
-                    console.warn(`[Omni-Director] Spatial coordinates unresolved for node: ${targetOrb.id}. Anchoring to origin.`);
-                }
+            if (activeCamera && liveTarget && typeof liveTarget.x === 'number' && !isNaN(liveTarget.x)) {
+                const scale = activeCamera.z || 1;
                 
-                // Commit spatial fold to the engine
+                // Continuously update camera to follow the migrating node
+                activeCamera.x = (window.innerWidth / 2) - (liveTarget.x * scale);
+                activeCamera.y = (window.innerHeight / 2) - (liveTarget.y * scale);
+                
                 if (typeof window.applyCamera === 'function') {
                     window.applyCamera();
                 } else if (typeof applyCamera === 'function') {
@@ -304,14 +296,22 @@
                 }
             }
 
-            // 4. Trigger the Perceptual Architect / Open Info Box
-            if (typeof window.openOrbInfo === 'function') {
-                window.openOrbInfo(targetOrb.id);
-            } else if (typeof openOrbInfo === 'function') {
-                openOrbInfo(targetOrb.id);
+            // Continue tracking until the physics have definitively settled
+            if (trackingFrames < maxFrames) {
+                requestAnimationFrame(trackTargetNode);
             }
-        }, 200); 
-            }
+        }
+        
+        // Initiate tracking immediately
+        trackTargetNode();
+
+        // 4. Trigger the Perceptual Architect / Open Info Box Instantly
+        if (typeof window.openOrbInfo === 'function') {
+            window.openOrbInfo(targetOrb.id);
+        } else if (typeof openOrbInfo === 'function') {
+            openOrbInfo(targetOrb.id);
+        }
+                   }
     
     
     // ==========================================
