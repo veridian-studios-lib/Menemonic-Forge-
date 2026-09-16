@@ -7,6 +7,8 @@
 (function () {
     'use strict';
 
+    let overlayOpenTime = 0; // SHIELD: Tracks exactly when the HUD opens
+
     // ==========================================
     // 1. TRIE INDEXING & ALGORITHM
     // ==========================================
@@ -80,7 +82,6 @@
 
             .search-box-container { width: 92%; max-width: 600px; position: relative; }
 
-            /* Google Mobile Style Input but Cyberpunk */
             #omni-search-input {
                 width: 100%; background: #111; border: 1px solid #333; color: #E0E0E0;
                 padding: 18px 24px 18px 50px; font-family: 'JetBrains Mono', monospace; font-size: 16px;
@@ -127,8 +128,9 @@
         const input = document.getElementById('omni-search-input');
         input.addEventListener('input', (e) => handleSearchInput(e.target.value));
 
-        // Close on background tap
+        // SHIELD IMPLEMENTED: Ignore taps that happen too fast after opening
         overlay.addEventListener('pointerdown', (e) => {
+            if (Date.now() - overlayOpenTime < 350) return; 
             if (e.target === overlay) closeSearchHUD();
         });
     }
@@ -139,7 +141,7 @@
     function handleSearchInput(query) {
         const cleanQuery = query.trim().toLowerCase();
         if (!cleanQuery) {
-            renderColdState(); // Show recent history/core axioms if empty
+            renderColdState(); 
             return;
         }
 
@@ -168,10 +170,8 @@
         list.innerHTML = '';
         const allOrbs = window.orbs || [];
         
-        // Grab the 5 most recently created/accessed Orbs (Simulation of History)
         const recentOrbs = allOrbs.slice(-5).reverse(); 
-        
-        recentOrbs.forEach(orb => renderResultCard(orb, '🕒')); // Clock icon for history
+        recentOrbs.forEach(orb => renderResultCard(orb, '🕒')); 
     }
 
     function renderResultCard(orb, iconSymbol) {
@@ -208,19 +208,21 @@
 
         if (typeof window.renderWeb === 'function') window.renderWeb();
 
-        const scale = window.camera.z || 1;
+        // Safety check for camera object
+        const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : { x: 0, y: 0, z: 1 });
+        const scale = activeCamera.z || 1;
         const targetX = (window.innerWidth / 2) - (targetOrb.x * scale);
         const targetY = (window.innerHeight / 2) - (targetOrb.y * scale);
 
         let frame = 0;
-        const startX = window.camera.x;
-        const startY = window.camera.y;
+        const startX = activeCamera.x;
+        const startY = activeCamera.y;
 
         function animateFold() {
             frame++;
             const ease = 1 - Math.pow(1 - (frame / 25), 3);
-            window.camera.x = startX + (targetX - startX) * ease;
-            window.camera.y = startY + (targetY - startY) * ease;
+            activeCamera.x = startX + (targetX - startX) * ease;
+            activeCamera.y = startY + (targetY - startY) * ease;
             if (typeof window.applyCamera === 'function') window.applyCamera();
             if (frame < 25) requestAnimationFrame(animateFold);
         }
@@ -233,14 +235,13 @@
     let lastCoreTap = 0;
 
     function setupTriggers() {
-        // 1. Red Giant Double Tap
         const core = document.querySelector('.sentient-core');
         if (core) {
             core.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
+                e.preventDefault(); // Prevents ghost clicks on mobile
                 const now = Date.now();
                 if (now - lastCoreTap < 350 && now - lastCoreTap > 0) {
-                    e.preventDefault();
                     openSearchHUD();
                     lastCoreTap = 0;
                 } else {
@@ -249,10 +250,8 @@
             });
         }
 
-        // 2. Ghost Keystroke (Press '/' to search)
         window.addEventListener('keydown', (e) => {
             if (e.key === '/' && !document.getElementById('omni-search-overlay').classList.contains('active')) {
-                // Ensure user isn't already typing in a different input (like an orb editor)
                 if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
                     e.preventDefault();
                     openSearchHUD();
@@ -263,15 +262,15 @@
     }
 
     function openSearchHUD() {
+        overlayOpenTime = Date.now(); // Record the exact timestamp the HUD was summoned
         rebuildTrieIndex();
         const overlay = document.getElementById('omni-search-overlay');
         const input = document.getElementById('omni-search-input');
         
         overlay.classList.add('active');
         input.value = '';
-        renderColdState(); // Initialize with recent/history view
+        renderColdState(); 
         
-        // Force mobile keyboard deployment
         setTimeout(() => {
             input.focus();
             input.click();
@@ -285,11 +284,9 @@
         if (overlay) overlay.classList.remove('active');
     }
 
-    // Initialize module
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => { injectSearchDOM(); setupTriggers(); });
     } else {
         injectSearchDOM(); setupTriggers();
     }
 })();
-      
