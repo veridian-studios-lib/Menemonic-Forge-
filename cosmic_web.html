@@ -456,6 +456,7 @@
 
         // --- 3. AXIOMATIC LATTICE STATE ---
         let orbs = JSON.parse(localStorage.getItem('mnemonic_orbs_v2')) || [];
+        window.orbs = orbs;
         let relations = JSON.parse(localStorage.getItem('mnemonic_relations_v2')) || [];
         
         let linkMode = false; let selectedForLink = null; let targetForLink = null;
@@ -475,6 +476,7 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
         }
 
         function saveData() {
+            window.orbs = orbs;
             localStorage.setItem('mnemonic_orbs_v2', JSON.stringify(orbs));
             localStorage.setItem('mnemonic_relations_v2', JSON.stringify(relations));
         }
