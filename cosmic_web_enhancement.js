@@ -243,6 +243,9 @@
     // ==========================================
 
     function foldToOrb(targetOrb) {
+        // OMNI-DIRECTOR SAFEGUARD: Prevent void collapse if no target is passed
+        if (!targetOrb) return; 
+        
         closeSearchHUD();
 
         // 1. Update Sub-Void Spatial Context
@@ -261,23 +264,37 @@
             backBtn.style.display = currentParent ? 'block' : 'none';
         }
 
-        // 2. Re-render Visual Web State
+        // 2. Re-render Visual Web State (Destroys old canvas node references)
         if (typeof window.renderWeb === 'function') {
             window.renderWeb();
         } else if (typeof renderWeb === 'function') {
             renderWeb();
         }
 
-        // 3. Viewport Stabilization Buffer (200ms for total mobile layout settlement)
+        // 3. Viewport Stabilization & Live Tracking Buffer
         setTimeout(() => {
             const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : null);
             
-            if (activeCamera && typeof targetOrb.x === 'number' && typeof targetOrb.y === 'number') {
+            if (activeCamera) {
+                // Fetch the 'live' rendered orb to prevent ghost references
+                const liveOrbs = typeof getGlobalOrbs === 'function' ? getGlobalOrbs() : [];
+                const liveTarget = liveOrbs.find(o => o.id === targetOrb.id) || targetOrb;
                 const scale = activeCamera.z || 1;
-                
-                // RESTORED NATIVE TRANSLATION MATH: Centers the node based on true viewport dimensions
-                activeCamera.x = (window.innerWidth / 2) - (targetOrb.x * scale);
-                activeCamera.y = (window.innerHeight / 2) - (targetOrb.y * scale);
+
+                // STRICT VALIDATION: Ensure coordinates exist, are numbers, and are NOT 'NaN'
+                if (liveTarget && 
+                    typeof liveTarget.x === 'number' && !isNaN(liveTarget.x) && 
+                    typeof liveTarget.y === 'number' && !isNaN(liveTarget.y)) {
+                    
+                    // Coordinates found: Snap directly to the calculated node
+                    activeCamera.x = (window.innerWidth / 2) - (liveTarget.x * scale);
+                    activeCamera.y = (window.innerHeight / 2) - (liveTarget.y * scale);
+                } else {
+                    // SPATIAL FALLBACK: Center the camera on the void's origin
+                    activeCamera.x = window.innerWidth / 2;
+                    activeCamera.y = window.innerHeight / 2;
+                    console.warn(`[Omni-Director] Spatial coordinates unresolved for node: ${targetOrb.id}. Anchoring to origin.`);
+                }
                 
                 // Commit spatial fold to the engine
                 if (typeof window.applyCamera === 'function') {
@@ -294,7 +311,7 @@
                 openOrbInfo(targetOrb.id);
             }
         }, 200); 
-    }
+            }
     
     
     // ==========================================
