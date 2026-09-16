@@ -1,13 +1,20 @@
 /**
- * THE MNEMOSYNE ENGINE - OMNI-SEARCH HUD
- * Features: Zero-Latency Trie Search, Mobile Keyboard Hijack, 
- * Cold-State History, and Spatial Void Folding.
+ * THE MNEMOSYNE ENGINE - OMNI-SEARCH HUD (v2.1 Mobile Stabilized)
+ * Features: Hardware Touch Shield (750ms Dilation), Direct Pointer Event Hijack,
+ * Zero-Latency Trie Search, Cold-State History, and Viewport-Settled Spatial Folding.
  */
 
 (function () {
     'use strict';
 
-    let overlayOpenTime = 0; // SHIELD: Tracks exactly when the HUD opens
+    let overlayOpenTime = 0; // SHIELD: Tracks timestamp when HUD opens
+
+    // Safe retrieval of active global orbs
+    function getGlobalOrbs() {
+        if (typeof window.orbs !== 'undefined' && Array.isArray(window.orbs)) return window.orbs;
+        if (typeof orbs !== 'undefined' && Array.isArray(orbs)) return orbs;
+        return [];
+    }
 
     // ==========================================
     // 1. TRIE INDEXING & ALGORITHM
@@ -54,12 +61,11 @@
 
     function rebuildTrieIndex() {
         omniTrie = new MnemonicTrie();
-        if (typeof window.orbs !== 'undefined' && Array.isArray(window.orbs)) {
-            window.orbs.forEach(orb => {
-                omniTrie.insert(orb.title, orb.id);
-                omniTrie.insert(orb.content, orb.id);
-            });
-        }
+        const currentOrbs = getGlobalOrbs();
+        currentOrbs.forEach(orb => {
+            omniTrie.insert(orb.title, orb.id);
+            omniTrie.insert(orb.content, orb.id);
+        });
     }
 
     // ==========================================
@@ -74,43 +80,47 @@
             
             #omni-search-overlay {
                 position: fixed; inset: 0; z-index: 9999;
-                background: rgba(5, 5, 5, 0.90); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-                display: none; flex-direction: column; align-items: center; padding-top: 10vh;
-                opacity: 0; transition: opacity 0.2s ease; pointer-events: auto;
+                background: rgba(5, 5, 5, 0.92); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+                display: none; flex-direction: column; align-items: center; padding-top: 8vh;
+                opacity: 0; transition: opacity 0.2s ease;
             }
             #omni-search-overlay.active { display: flex; opacity: 1; }
 
-            .search-box-container { width: 92%; max-width: 600px; position: relative; }
+            .search-box-container { width: 92%; max-width: 600px; position: relative; pointer-events: auto; }
 
             #omni-search-input {
                 width: 100%; background: #111; border: 1px solid #333; color: #E0E0E0;
-                padding: 18px 24px 18px 50px; font-family: 'JetBrains Mono', monospace; font-size: 16px;
+                padding: 16px 20px 16px 48px; font-family: 'JetBrains Mono', monospace; font-size: 16px;
                 border-radius: 30px; outline: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
                 transition: border-color 0.3s, box-shadow 0.3s;
             }
-            #omni-search-input:focus { border-color: #00F2FF; box-shadow: 0 0 30px rgba(0, 242, 255, 0.2); }
+            #omni-search-input:focus { border-color: #00F2FF; box-shadow: 0 0 25px rgba(0, 242, 255, 0.25); }
             
             .search-icon-static {
                 position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
-                color: #555; font-size: 20px; font-family: sans-serif; pointer-events: none;
+                color: #555; font-size: 18px; font-family: sans-serif; pointer-events: none;
             }
 
             #omni-results-list {
-                width: 92%; max-width: 600px; margin-top: 12px; max-height: 60vh;
-                overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+                width: 92%; max-width: 600px; margin-top: 12px; max-height: 55vh;
+                overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+                pointer-events: auto;
             }
 
             .search-result-card {
-                padding: 16px 20px; border-radius: 12px; cursor: pointer;
-                display: flex; align-items: center; gap: 15px;
-                transition: background 0.15s;
+                padding: 14px 18px; border-radius: 12px; cursor: pointer; background: rgba(255, 255, 255, 0.02);
+                display: flex; align-items: center; gap: 14px; border: 1px solid rgba(255, 255, 255, 0.05);
+                transition: background 0.15s, border-color 0.15s; touch-action: manipulation;
             }
-            .search-result-card:active, .search-result-card:hover { background: rgba(255, 255, 255, 0.05); }
+            .search-result-card:active, .search-result-card:hover { 
+                background: rgba(0, 242, 255, 0.08); 
+                border-color: rgba(0, 242, 255, 0.3);
+            }
             
-            .result-icon { font-size: 18px; color: #777; width: 20px; text-align: center; }
-            .result-text-stack { display: flex; flex-direction: column; }
-            .result-title { font-family: 'Cinzel', serif; color: #FFF; font-size: 15px; }
-            .result-path { font-family: 'JetBrains Mono', monospace; color: #00F2FF; font-size: 11px; opacity: 0.6; }
+            .result-icon { font-size: 16px; color: #888; width: 20px; text-align: center; }
+            .result-text-stack { display: flex; flex-direction: column; gap: 2px; }
+            .result-title { font-family: 'Cinzel', serif; color: #FFF; font-size: 14px; letter-spacing: 0.5px; }
+            .result-path { font-family: 'JetBrains Mono', monospace; color: #00F2FF; font-size: 10px; opacity: 0.7; }
         `;
         document.head.appendChild(style);
 
@@ -128,9 +138,9 @@
         const input = document.getElementById('omni-search-input');
         input.addEventListener('input', (e) => handleSearchInput(e.target.value));
 
-        // SHIELD IMPLEMENTED: Ignore taps that happen too fast after opening
+        // SHIELD IMPLEMENTED: 750ms Guard against ghost taps and touch-releases
         overlay.addEventListener('pointerdown', (e) => {
-            if (Date.now() - overlayOpenTime < 350) return; 
+            if (Date.now() - overlayOpenTime < 750) return; 
             if (e.target === overlay) closeSearchHUD();
         });
     }
@@ -141,13 +151,13 @@
     function handleSearchInput(query) {
         const cleanQuery = query.trim().toLowerCase();
         if (!cleanQuery) {
-            renderColdState(); 
+            renderColdState();
             return;
         }
 
         const list = document.getElementById('omni-results-list');
         list.innerHTML = '';
-        const allOrbs = window.orbs || [];
+        const allOrbs = getGlobalOrbs();
         
         const trieMatchedIds = omniTrie.searchPrefix(cleanQuery);
         const matchedOrbs = allOrbs.filter(orb => {
@@ -156,9 +166,14 @@
         });
 
         if (matchedOrbs.length === 0) {
-            list.innerHTML = `<div class="search-result-card"><span class="result-icon">⚡</span>
-                              <div class="result-text-stack"><span class="result-title" style="color:#FF1A1A;">Summon Grand Conclave</span>
-                              <span class="result-path">GENERATE NEW AXIOM</span></div></div>`;
+            list.innerHTML = `
+                <div class="search-result-card" style="border-color: rgba(255, 26, 26, 0.4);">
+                    <span class="result-icon">⚡</span>
+                    <div class="result-text-stack">
+                        <span class="result-title" style="color:#FF1A1A;">Summon Grand Conclave</span>
+                        <span class="result-path">GENERATE NEW AXIOM</span>
+                    </div>
+                </div>`;
             return;
         }
 
@@ -168,10 +183,10 @@
     function renderColdState() {
         const list = document.getElementById('omni-results-list');
         list.innerHTML = '';
-        const allOrbs = window.orbs || [];
+        const allOrbs = getGlobalOrbs();
         
         const recentOrbs = allOrbs.slice(-5).reverse(); 
-        recentOrbs.forEach(orb => renderResultCard(orb, '🕒')); 
+        recentOrbs.forEach(orb => renderResultCard(orb, '🕒'));
     }
 
     function renderResultCard(orb, iconSymbol) {
@@ -180,8 +195,9 @@
         card.className = 'search-result-card';
         
         let parentName = "MAIN VOID";
-        if (orb.parentId && window.orbs) {
-            const parent = window.orbs.find(p => p.id === orb.parentId);
+        const allOrbs = getGlobalOrbs();
+        if (orb.parentId) {
+            const parent = allOrbs.find(p => p.id === orb.parentId);
             if (parent) parentName = parent.title;
         }
 
@@ -192,7 +208,14 @@
                 <span class="result-path">IN: ${parentName}</span>
             </div>
         `;
-        card.addEventListener('click', () => foldToOrb(orb));
+
+        // POINTER INTERCEPT: Hijack before mobile keyboard dismissal drops the event
+        card.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            foldToOrb(orb);
+        });
+
         list.appendChild(card);
     }
 
@@ -201,36 +224,69 @@
     // ==========================================
     function foldToOrb(targetOrb) {
         closeSearchHUD();
-        window.currentParentId = targetOrb.parentId || null;
-        
-        const backBtn = document.getElementById('backBtn');
-        if (backBtn) backBtn.style.display = window.currentParentId ? 'block' : 'none';
 
-        if (typeof window.renderWeb === 'function') window.renderWeb();
-
-        // Safety check for camera object
-        const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : { x: 0, y: 0, z: 1 });
-        const scale = activeCamera.z || 1;
-        const targetX = (window.innerWidth / 2) - (targetOrb.x * scale);
-        const targetY = (window.innerHeight / 2) - (targetOrb.y * scale);
-
-        let frame = 0;
-        const startX = activeCamera.x;
-        const startY = activeCamera.y;
-
-        function animateFold() {
-            frame++;
-            const ease = 1 - Math.pow(1 - (frame / 25), 3);
-            activeCamera.x = startX + (targetX - startX) * ease;
-            activeCamera.y = startY + (targetY - startY) * ease;
-            if (typeof window.applyCamera === 'function') window.applyCamera();
-            if (frame < 25) requestAnimationFrame(animateFold);
+        // 1. Update sub-void level across scopes
+        if (typeof window.setCurrentParentId === 'function') {
+            window.setCurrentParentId(targetOrb.parentId || null);
+        } else {
+            window.currentParentId = targetOrb.parentId || null;
         }
-        animateFold();
+
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            const parentVal = typeof window.getCurrentParentId === 'function' 
+                ? window.getCurrentParentId() 
+                : window.currentParentId;
+            backBtn.style.display = parentVal ? 'block' : 'none';
+        }
+
+        // 2. Re-render web for target context
+        if (typeof window.renderWeb === 'function') {
+            window.renderWeb();
+        } else if (typeof renderWeb === 'function') {
+            renderWeb();
+        }
+
+        // 3. 150ms Buffer allows mobile keyboard collapse to settle viewport dimensions
+        setTimeout(() => {
+            const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : null);
+            if (activeCamera && typeof targetOrb.x === 'number' && typeof targetOrb.y === 'number') {
+                const scale = activeCamera.z || 1;
+                const targetX = (window.innerWidth / 2) - (targetOrb.x * scale);
+                const targetY = (window.innerHeight / 2) - (targetOrb.y * scale);
+
+                let frame = 0;
+                const startX = activeCamera.x;
+                const startY = activeCamera.y;
+
+                function animateFold() {
+                    frame++;
+                    const ease = 1 - Math.pow(1 - (frame / 25), 3);
+                    activeCamera.x = startX + (targetX - startX) * ease;
+                    activeCamera.y = startY + (targetY - startY) * ease;
+                    
+                    if (typeof window.applyCamera === 'function') {
+                        window.applyCamera();
+                    } else if (typeof applyCamera === 'function') {
+                        applyCamera();
+                    }
+                    
+                    if (frame < 25) requestAnimationFrame(animateFold);
+                }
+                animateFold();
+            }
+
+            // 4. Open orb details modal
+            if (typeof window.openOrbInfo === 'function') {
+                window.openOrbInfo(targetOrb.id);
+            } else if (typeof openOrbInfo === 'function') {
+                openOrbInfo(targetOrb.id);
+            }
+        }, 150);
     }
 
     // ==========================================
-    // 5. TRIGGERS: DOUBLE-TAP & GHOST KEYSTROKE
+    // 5. TRIGGERS & HARDWARE TOUCH SHIELD
     // ==========================================
     let lastCoreTap = 0;
 
@@ -239,7 +295,7 @@
         if (core) {
             core.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
-                e.preventDefault(); // Prevents ghost clicks on mobile
+                e.preventDefault();
                 const now = Date.now();
                 if (now - lastCoreTap < 350 && now - lastCoreTap > 0) {
                     openSearchHUD();
@@ -262,19 +318,21 @@
     }
 
     function openSearchHUD() {
-        overlayOpenTime = Date.now(); // Record the exact timestamp the HUD was summoned
+        overlayOpenTime = Date.now();
         rebuildTrieIndex();
         const overlay = document.getElementById('omni-search-overlay');
         const input = document.getElementById('omni-search-input');
         
+        // Disable pointer interactions briefly during activation transition
+        overlay.style.pointerEvents = 'none';
         overlay.classList.add('active');
         input.value = '';
         renderColdState(); 
-        
+
         setTimeout(() => {
+            overlay.style.pointerEvents = 'auto';
             input.focus();
-            input.click();
-        }, 10);
+        }, 300);
     }
 
     function closeSearchHUD() {
