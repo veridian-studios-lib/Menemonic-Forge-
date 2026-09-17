@@ -787,6 +787,10 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
         }
         // --- 7. FRACTAL NAVIGATION ---
         function enterSubVoid() {
+            // THE SHIELD: Intercepts the tap and kills the kinetic transfer to the canvas
+            const e = window.event;
+            if (e) { e.stopPropagation(); e.preventDefault(); }
+
             if (!activeOrbId) return;
             currentParentId = activeOrbId;
             closeModal('modal-orb-info');
@@ -796,7 +800,7 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             camera.y = window.innerHeight / 2;
             camera.z = 1;
 
-            // Target Anchor Sync (Prevents background render-loop snapping)
+            // Target Anchor Sync 
             if (typeof targetX !== 'undefined') targetX = camera.x;
             if (typeof targetY !== 'undefined') targetY = camera.y;
             if (typeof camera.targetX !== 'undefined') camera.targetX = camera.x;
@@ -810,9 +814,13 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
         }
 
         function ascendVoid() {
+            // THE SHIELD: Intercepts the tap and kills the kinetic transfer to the canvas
+            const e = window.event;
+            if (e) { e.stopPropagation(); e.preventDefault(); }
+
             if (currentParentId === null) return; // Already at root
             
-            // Safe loose-equality lookup (handles both string and numeric IDs)
+            // Safe loose-equality lookup 
             const currentOrb = orbs.find(o => o.id == currentParentId);
             
             // Only fall back to null if currentOrb explicitly has no parentId
@@ -827,7 +835,7 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             camera.y = window.innerHeight / 2;
             camera.z = 1;
 
-            // Target Anchor Sync (Prevents background render-loop snapping)
+            // Target Anchor Sync
             if (typeof targetX !== 'undefined') targetX = camera.x;
             if (typeof targetY !== 'undefined') targetY = camera.y;
             if (typeof camera.targetX !== 'undefined') camera.targetX = camera.x;
@@ -838,7 +846,7 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             const backBtn = document.getElementById('backBtn');
             if (backBtn) backBtn.style.display = currentParentId ? 'block' : 'none';
             renderWeb();
-                }
+        }
 
             // --- 8. MENU HELPERS ---
         function toggleActionMenu(id, e) {
