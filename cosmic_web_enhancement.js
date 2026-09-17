@@ -285,9 +285,20 @@
             if (activeCamera && liveTarget && typeof liveTarget.x === 'number' && !isNaN(liveTarget.x)) {
                 const scale = activeCamera.z || 1;
                 
-                // Continuously update camera to follow the migrating node
-                activeCamera.x = (window.innerWidth / 2) - (liveTarget.x * scale);
-                activeCamera.y = (window.innerHeight / 2) - (liveTarget.y * scale);
+                // 1. Calculate the exact centered position
+                const newCamX = (window.innerWidth / 2) - (liveTarget.x * scale);
+                const newCamY = (window.innerHeight / 2) - (liveTarget.y * scale);
+
+                // 2. Update the active camera coordinates
+                activeCamera.x = newCamX;
+                activeCamera.y = newCamY;
+
+                // 3. THE ANCHOR OVERRIDE: Force the main engine's background target to accept the new location.
+                // This prevents the engine from snapping back when you close the info modal.
+                if (typeof window.targetX !== 'undefined') window.targetX = newCamX;
+                if (typeof window.targetY !== 'undefined') window.targetY = newCamY;
+                if (activeCamera.targetX !== undefined) activeCamera.targetX = newCamX;
+                if (activeCamera.targetY !== undefined) activeCamera.targetY = newCamY;
                 
                 if (typeof window.applyCamera === 'function') {
                     window.applyCamera();
@@ -296,22 +307,10 @@
                 }
             }
 
-            // Continue tracking until the physics have definitively settled
             if (trackingFrames < maxFrames) {
                 requestAnimationFrame(trackTargetNode);
             }
         }
-        
-        // Initiate tracking immediately
-        trackTargetNode();
-
-        // 4. Trigger the Perceptual Architect / Open Info Box Instantly
-        if (typeof window.openOrbInfo === 'function') {
-            window.openOrbInfo(targetOrb.id);
-        } else if (typeof openOrbInfo === 'function') {
-            openOrbInfo(targetOrb.id);
-        }
-                   }
     
     
     // ==========================================
