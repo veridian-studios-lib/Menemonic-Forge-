@@ -242,85 +242,79 @@
     // 4. SPATIAL FOLDING & CAMERA SNAP
     // ==========================================
 
-    function foldToOrb(targetOrb) {
-        // OMNI-DIRECTOR SAFEGUARD
-        if (!targetOrb) return; 
-        
-        closeSearchHUD();
+        function foldToOrb(targetOrb) {
+            if (!targetOrb) return; 
+            
+            closeSearchHUD();
 
-        // 1. Update Sub-Void Spatial Context
-        const targetParent = targetOrb.parentId || null;
-        if (typeof window.setCurrentParentId === 'function') {
-            window.setCurrentParentId(targetParent);
-        } else {
-            window.currentParentId = targetParent;
-        }
+            // 1. THE FRACTAL SHIFT: Directly mutate the engine's declarative state
+            const targetParent = typeof targetOrb.parentId !== 'undefined' ? targetOrb.parentId : null;
+            
+            // Bypass the 'window' object and update the core engine variable directly
+            currentParentId = targetParent; 
 
-        const backBtn = document.getElementById('backBtn');
-        if (backBtn) {
-            const currentParent = typeof window.getCurrentParentId === 'function' 
-                ? window.getCurrentParentId() 
-                : window.currentParentId;
-            backBtn.style.display = currentParent ? 'block' : 'none';
-        }
+            const backBtn = document.getElementById('backBtn');
+            if (backBtn) {
+                backBtn.style.display = currentParentId ? 'block' : 'none';
+            }
 
-        // 2. Trigger the Engine's Visual Re-render
-        if (typeof window.renderWeb === 'function') {
-            window.renderWeb();
-        } else if (typeof renderWeb === 'function') {
-            renderWeb();
-        }
+            // 2. FORCE THE ENVIRONMENT RENDER
+            // We must draw the new void before the camera moves, otherwise the target doesn't exist on screen
+            if (typeof renderWeb === 'function') {
+                renderWeb();
+            } else if (typeof window.renderWeb === 'function') {
+                window.renderWeb();
+            }
 
-        // 3. The Omni-Seeker Protocol (Active Tracking Loop)
-        let trackingFrames = 0;
-        const maxFrames = 120; // Approx 2 seconds at 60fps
-        
-        function trackTargetNode() {
-            trackingFrames++;
-            const activeCamera = window.camera || (typeof camera !== 'undefined' ? camera : null);
-            const liveOrbs = typeof getGlobalOrbs === 'function' ? getGlobalOrbs() : (window.orbs || []);
-            const liveTarget = liveOrbs.find(o => o.id === targetOrb.id);
-
-            if (activeCamera && liveTarget && typeof liveTarget.x === 'number' && !isNaN(liveTarget.x)) {
-                const scale = activeCamera.z || 1;
+            // 3. OMNI-SEEKER PROTOCOL (Active Tracking Loop)
+            let trackingFrames = 0;
+            const maxFrames = 120; 
+            
+            function trackTargetNode() {
+                trackingFrames++;
+                const activeCamera = typeof camera !== 'undefined' ? camera : window.camera;
+                const liveOrbs = typeof getGlobalOrbs === 'function' ? getGlobalOrbs() : (window.orbs || []);
                 
-                // Calculate the exact centered position
-                const newCamX = (window.innerWidth / 2) - (liveTarget.x * scale);
-                const newCamY = (window.innerHeight / 2) - (liveTarget.y * scale);
+                // Re-find the target in the newly rendered void
+                const liveTarget = liveOrbs.find(o => o.id === targetOrb.id);
 
-                // Update the active camera coordinates
-                activeCamera.x = newCamX;
-                activeCamera.y = newCamY;
+                if (activeCamera && liveTarget && typeof liveTarget.x === 'number' && !isNaN(liveTarget.x)) {
+                    const scale = activeCamera.z || 1;
+                    
+                    const newCamX = (window.innerWidth / 2) - (liveTarget.x * scale);
+                    const newCamY = (window.innerHeight / 2) - (liveTarget.y * scale);
 
-                // THE ANCHOR OVERRIDE
-                if (typeof window.targetX !== 'undefined') window.targetX = newCamX;
-                if (typeof window.targetY !== 'undefined') window.targetY = newCamY;
-                if (activeCamera.targetX !== undefined) activeCamera.targetX = newCamX;
-                if (activeCamera.targetY !== undefined) activeCamera.targetY = newCamY;
-                
-                if (typeof window.applyCamera === 'function') {
-                    window.applyCamera();
-                } else if (typeof applyCamera === 'function') {
-                    applyCamera();
+                    activeCamera.x = newCamX;
+                    activeCamera.y = newCamY;
+
+                    // Target Anchor Sync (Prevents background render-loop snapping)
+                    if (typeof targetX !== 'undefined') targetX = newCamX;
+                    if (typeof targetY !== 'undefined') targetY = newCamY;
+                    if (activeCamera.targetX !== undefined) activeCamera.targetX = newCamX;
+                    if (activeCamera.targetY !== undefined) activeCamera.targetY = newCamY;
+                    
+                    if (typeof applyCamera === 'function') {
+                        applyCamera();
+                    } else if (typeof window.applyCamera === 'function') {
+                        window.applyCamera();
+                    }
+                }
+
+                if (trackingFrames < maxFrames) {
+                    requestAnimationFrame(trackTargetNode);
                 }
             }
+            
+            // 4. EXECUTE PROTOCOLS
+            trackTargetNode(); 
 
-            if (trackingFrames < maxFrames) {
-                requestAnimationFrame(trackTargetNode);
+            // Auto-open the information panel for the selected node
+            if (typeof openOrbInfo === 'function') {
+                openOrbInfo(targetOrb.id);
+            } else if (typeof window.openOrbInfo === 'function') {
+                window.openOrbInfo(targetOrb.id);
             }
         }
-        
-        // 4. INITIATE PROTOCOLS (These were missing!)
-        trackTargetNode(); // Start the camera stabilization loop
-
-        // Trigger the Perceptual Architect / Open Info Box Instantly
-        if (typeof window.openOrbInfo === 'function') {
-            window.openOrbInfo(targetOrb.id);
-        } else if (typeof openOrbInfo === 'function') {
-            openOrbInfo(targetOrb.id);
-        }
-    } // <-- THIS CLOSING BRACKET WAS MISSING
-    
     
     // ==========================================
     // 5. TRIGGERS & HARDWARE TOUCH SHIELD
