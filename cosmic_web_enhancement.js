@@ -272,7 +272,6 @@
         }
 
         // 3. The Omni-Seeker Protocol (Active Tracking Loop)
-        // Tracks the target node for 2 seconds while kinetic physics settle
         let trackingFrames = 0;
         const maxFrames = 120; // Approx 2 seconds at 60fps
         
@@ -285,16 +284,15 @@
             if (activeCamera && liveTarget && typeof liveTarget.x === 'number' && !isNaN(liveTarget.x)) {
                 const scale = activeCamera.z || 1;
                 
-                // 1. Calculate the exact centered position
+                // Calculate the exact centered position
                 const newCamX = (window.innerWidth / 2) - (liveTarget.x * scale);
                 const newCamY = (window.innerHeight / 2) - (liveTarget.y * scale);
 
-                // 2. Update the active camera coordinates
+                // Update the active camera coordinates
                 activeCamera.x = newCamX;
                 activeCamera.y = newCamY;
 
-                // 3. THE ANCHOR OVERRIDE: Force the main engine's background target to accept the new location.
-                // This prevents the engine from snapping back when you close the info modal.
+                // THE ANCHOR OVERRIDE
                 if (typeof window.targetX !== 'undefined') window.targetX = newCamX;
                 if (typeof window.targetY !== 'undefined') window.targetY = newCamY;
                 if (activeCamera.targetX !== undefined) activeCamera.targetX = newCamX;
@@ -311,13 +309,22 @@
                 requestAnimationFrame(trackTargetNode);
             }
         }
+        
+        // 4. INITIATE PROTOCOLS (These were missing!)
+        trackTargetNode(); // Start the camera stabilization loop
+
+        // Trigger the Perceptual Architect / Open Info Box Instantly
+        if (typeof window.openOrbInfo === 'function') {
+            window.openOrbInfo(targetOrb.id);
+        } else if (typeof openOrbInfo === 'function') {
+            openOrbInfo(targetOrb.id);
+        }
+    } // <-- THIS CLOSING BRACKET WAS MISSING
     
     
     // ==========================================
     // 5. TRIGGERS & HARDWARE TOUCH SHIELD
     // ==========================================
-    let lastCoreTap = 0;
-
     let lastCoreTap = 0;
 
     function setupTriggers() {
