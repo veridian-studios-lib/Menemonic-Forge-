@@ -318,49 +318,44 @@
     // ==========================================
     let lastCoreTap = 0;
 
+    let lastCoreTap = 0;
+
     function setupTriggers() {
-        const core = document.querySelector('.sentient-core');
-        if (core) {
-            core.addEventListener('pointerdown', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                const now = Date.now();
-                if (now - lastCoreTap < 350 && now - lastCoreTap > 0) {
-                    openSearchHUD();
-                    lastCoreTap = 0;
-                } else {
-                    lastCoreTap = now;
-                }
-            });
-        }
+        // 1. THE DELEGATION OVERRIDE
+        // Attach the listener to the indestructible document, not the fragile rendered nodes.
+        document.addEventListener('pointerdown', (e) => {
+            // Check if the tapped element is the sentient-core (Red Giant) or inside it
+            const core = e.target.closest('.sentient-core');
+            if (!core) return; // If space or another node was tapped, ignore it.
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key === '/' && !document.getElementById('omni-search-overlay').classList.contains('active')) {
-                if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                    e.preventDefault();
-                    openSearchHUD();
-                }
+            e.stopPropagation();
+            e.preventDefault();
+            const now = Date.now();
+            
+            // 350ms Double-Tap Window
+            if (now - lastCoreTap < 350 && now - lastCoreTap > 0) {
+                openSearchHUD();
+                lastCoreTap = 0;
+            } else {
+                lastCoreTap = now;
             }
-            if (e.key === 'Escape') closeSearchHUD();
-        });
-    }
+        }, { passive: false }); // Required to allow preventDefault() on mobile
 
-    function openSearchHUD() {
-        overlayOpenTime = Date.now();
-        rebuildTrieIndex();
-        const overlay = document.getElementById('omni-search-overlay');
-        const input = document.getElementById('omni-search-input');
-        
-        // Disable pointer interactions briefly during activation transition
-        overlay.style.pointerEvents = 'none';
-        overlay.classList.add('active');
-        input.value = '';
-        renderColdState(); 
-
-        setTimeout(() => {
-            overlay.style.pointerEvents = 'auto';
-            input.focus();
-        }, 300);
+        // 2. PREVENT DUPLICATE KEYBINDS
+        // Ensure the keyboard shortcuts are only registered once, even if setupTriggers is called again
+        if (!window.omniSearchKeysBound) {
+            window.addEventListener('keydown', (e) => {
+                const overlay = document.getElementById('omni-search-overlay');
+                if (e.key === '/' && overlay && !overlay.classList.contains('active')) {
+                    if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                        e.preventDefault();
+                        openSearchHUD();
+                    }
+                }
+                if (e.key === 'Escape') closeSearchHUD();
+            });
+            window.omniSearchKeysBound = true;
+        }
     }
 
     function closeSearchHUD() {
