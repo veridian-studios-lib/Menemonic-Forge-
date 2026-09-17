@@ -365,6 +365,28 @@
         }
     }
 
+    function openSearchHUD() {
+        // 1. Refresh the Cognitive Map
+        rebuildTrieIndex(); 
+        
+        const overlay = document.getElementById('omni-search-overlay');
+        const input = document.getElementById('omni-search-input');
+        
+        // 2. Materialize the Interface and Arm the Shield
+        if (overlay) {
+            overlay.classList.add('active');
+            overlayOpenTime = Date.now(); 
+        }
+        
+        // 3. Prepare the Input and Cold State
+        if (input) {
+            input.value = ''; 
+            renderColdState(); 
+            // 50ms delay allows the CSS transition to initialize before capturing focus
+            setTimeout(() => input.focus(), 50); 
+        }
+    }
+     
     function closeSearchHUD() {
         const overlay = document.getElementById('omni-search-overlay');
         const input = document.getElementById('omni-search-input');
