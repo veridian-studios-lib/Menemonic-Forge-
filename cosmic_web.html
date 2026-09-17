@@ -785,38 +785,60 @@ let currentParentId = null; // FRACTAL CORE: Tracks which void we are currently 
             document.getElementById('rel-info-content-input').value = rel.content;
             openModal('modal-relation-info');
         }
-        // --- 7. FRACTAL NAVIGATION PROTOCOLS ---
+        // --- 7. FRACTAL NAVIGATION ---
         function enterSubVoid() {
             if (!activeOrbId) return;
-            currentParentId = activeOrbId; // Set the current room to the orb we just clicked
+            currentParentId = activeOrbId;
             closeModal('modal-orb-info');
             
-            // Re-center the camera on the Sentient Core
+            // Re-center the Camera
             camera.x = window.innerWidth / 2;
             camera.y = window.innerHeight / 2;
             camera.z = 1;
+
+            // Target Anchor Sync (Prevents background render-loop snapping)
+            if (typeof targetX !== 'undefined') targetX = camera.x;
+            if (typeof targetY !== 'undefined') targetY = camera.y;
+            if (typeof camera.targetX !== 'undefined') camera.targetX = camera.x;
+            if (typeof camera.targetY !== 'undefined') camera.targetY = camera.y;
+
             applyCamera();
             
-            document.getElementById('backBtn').style.display = 'block';
+            const backBtn = document.getElementById('backBtn');
+            if (backBtn) backBtn.style.display = 'block';
             renderWeb();
         }
 
         function ascendVoid() {
-            if (currentParentId === null) return; // Already at the top
+            if (currentParentId === null) return; // Already at root
             
-            // Find the parent of the current void to go up one level
-            const currentOrb = orbs.find(o => o.id === currentParentId);
-            currentParentId = currentOrb && currentOrb.parentId ? currentOrb.parentId : null;
+            // Safe loose-equality lookup (handles both string and numeric IDs)
+            const currentOrb = orbs.find(o => o.id == currentParentId);
             
-            // Re-center the camera
+            // Only fall back to null if currentOrb explicitly has no parentId
+            if (currentOrb && typeof currentOrb.parentId !== 'undefined') {
+                currentParentId = currentOrb.parentId;
+            } else {
+                currentParentId = null;
+            }
+            
+            // Re-center the Camera
             camera.x = window.innerWidth / 2;
             camera.y = window.innerHeight / 2;
             camera.z = 1;
+
+            // Target Anchor Sync (Prevents background render-loop snapping)
+            if (typeof targetX !== 'undefined') targetX = camera.x;
+            if (typeof targetY !== 'undefined') targetY = camera.y;
+            if (typeof camera.targetX !== 'undefined') camera.targetX = camera.x;
+            if (typeof camera.targetY !== 'undefined') camera.targetY = camera.y;
+
             applyCamera();
 
-            document.getElementById('backBtn').style.display = currentParentId ? 'block' : 'none';
+            const backBtn = document.getElementById('backBtn');
+            if (backBtn) backBtn.style.display = currentParentId ? 'block' : 'none';
             renderWeb();
-        }
+                }
 
             // --- 8. MENU HELPERS ---
         function toggleActionMenu(id, e) {
